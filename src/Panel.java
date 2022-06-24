@@ -30,41 +30,10 @@ public class Panel extends JPanel implements ActionListener {
         time = 0;
         betweenTime = 0;
 
-        fov = 90;
-        double zNear = 0.1;
-        double zFar = 1000;
-        double aspectRatio = (double) HEIGHT/WIDTH;
-        double scaleFactor = 1/Math.tan(Math.toRadians(fov)/2);
-        projectionMatrix = new double[4][4];
-        projectionMatrix[0][0] = aspectRatio*scaleFactor;
-        projectionMatrix[1][1] = scaleFactor;
-        projectionMatrix[2][2] = zFar/(zFar-zNear);
-        projectionMatrix[3][2] = -1*(zFar*zNear)/(zFar-zNear);
-        projectionMatrix[2][3] = 1;
+        projectionMatrix = matProjection(90,(double) HEIGHT/WIDTH, 0.1, 1000);
 
         camera = new Point(0, 0, 0);
 
-//        ArrayList<Triangle> t = new ArrayList<Triangle>();
-//        //always draw triangles in a clockwise fashion so that the normals aren't all wack
-//
-//        //South
-//        t.add(new Triangle(new Point(0.0, 0.0, 0.0), new Point(0.0, 1.0, 0.0), new Point(1.0, 1.0, 0.0)));
-//        t.add(new Triangle(new Point(0.0, 0.0, 0.0), new Point(1.0, 1.0, 0.0), new Point(1.0, 0.0, 0.0)));
-//        //East
-//        t.add(new Triangle(new Point(1.0, 0.0, 0.0), new Point(1.0, 1.0, 0.0), new Point(1.0, 1.0, 1.0)));
-//        t.add(new Triangle(new Point(1.0, 0.0, 0.0), new Point(1.0, 1.0, 1.0), new Point(1.0, 0.0, 1.0)));
-//        //North
-//        t.add(new Triangle(new Point(1.0, 0.0, 1.0), new Point(1.0, 1.0, 1.0), new Point(0.0, 1.0, 1.0)));
-//        t.add(new Triangle(new Point(1.0, 0.0, 1.0), new Point(0.0, 1.0, 1.0), new Point(0.0, 0.0, 1.0)));
-//        //West
-//        t.add(new Triangle(new Point(0.0, 0.0, 1.0), new Point(0.0, 1.0, 1.0), new Point(0.0, 1.0, 0.0)));
-//        t.add(new Triangle(new Point(0.0, 0.0, 1.0), new Point(0.0, 1.0, 0.0), new Point(0.0, 0.0, 0.0)));
-//        //Top
-//        t.add(new Triangle(new Point(0.0, 1.0, 0.0), new Point(0.0, 1.0, 1.0), new Point(1.0, 1.0, 1.0)));
-//        t.add(new Triangle(new Point(0.0, 1.0, 0.0), new Point(1.0, 1.0, 1.0), new Point(1.0, 1.0, 0.0)));
-//        //Bottom
-//        t.add(new Triangle(new Point(0.0, 0.0, 1.0), new Point(0.0, 0.0, 0.0), new Point(1.0, 0.0, 0.0)));
-//        t.add(new Triangle(new Point(0.0, 0.0, 1.0), new Point(1.0, 0.0, 0.0), new Point(1.0, 0.0, 1.0)));
         meshCube = new Mesh(new ArrayList<Triangle>());
         meshCube.readObj("C:\\Users\\eydon\\IdeaProjects\\3DRendering\\src\\Cow.txt");
     }
@@ -84,6 +53,106 @@ public class Panel extends JPanel implements ActionListener {
         return new Point(x, y, z);
     }
 
+    public double[][] matIdentity() {
+        double[][] m = new double[4][4];
+        m[0][0] = 1;
+        m[1][1] = 1;
+        m[2][2] = 1;
+        m[3][3] = 1;
+        return m;
+    }
+    public double[][] matRotX(double rad) {
+        double[][] rotX = new double[4][4];
+        rotX[0][0] = 1;
+        rotX[1][1] = Math.cos(rad);
+        rotX[1][2] = -1*Math.sin(rad);
+        rotX[2][1] = Math.sin(rad);
+        rotX[2][2] = Math.cos(rad);
+        rotX[3][3] = 1;
+        return rotX;
+    }
+    public double[][] matRotY(double rad) {
+        double[][] rotY = new double[4][4];
+        rotY[0][0] = Math.cos(rad);
+        rotY[0][2] = Math.sin(rad);
+        rotY[2][0] = -1*Math.sin(rad);
+        rotY[1][1] = 1;
+        rotY[2][2] = Math.cos(rad);
+        rotY[3][3] = 1;
+        return rotY;
+    }
+    public double[][] matRotZ(double rad) {
+        double[][] rotZ = new double[4][4];
+        rotZ[0][0] = Math.cos(rad);
+        rotZ[0][1] = -1*Math.sin(rad);
+        rotZ[1][0] = Math.sin(rad);
+        rotZ[1][1] = Math.cos(rad);
+        rotZ[2][2] = 1;
+        rotZ[3][3] = 1;
+        return rotZ;
+    }
+    public double[][] matTranslation(double x, double y, double z) {
+        double[][] mat = new double[4][4];
+        mat[0][0] = 1;
+        mat[1][1] = 1;
+        mat[2][2] = 1;
+        mat[3][3] = 1;
+        mat[3][0] = x;
+        mat[3][1] = y;
+        mat[3][2] = z;
+        return mat;
+    }
+    public double[][] matProjection(double fovDeg, double aspectRatio, double zNear, double zFar) {
+        double scaleFactor = 1/Math.tan(Math.toRadians(fovDeg)/2);
+        projectionMatrix = new double[4][4];
+        projectionMatrix[0][0] = aspectRatio*scaleFactor;
+        projectionMatrix[1][1] = scaleFactor;
+        projectionMatrix[2][2] = zFar/(zFar-zNear);
+        projectionMatrix[3][2] = -1*(zFar*zNear)/(zFar-zNear);
+        projectionMatrix[2][3] = 1;
+        return projectionMatrix;
+    }
+    public double[][] multiplyMat(double[][] m1, double[][] m2) {
+        double[][] mat = new double[4][4];
+        for (int r = 0; r < 4; r++) {
+            for (int c = 0; c < 4; c++) {
+                mat[r][c] = m1[r][0]*m2[0][c] + m1[r][1]*m2[1][c] + m1[r][2]*m2[2][c] + m1[r][3]*m2[3][c];
+            }
+        }
+        return mat;
+    }
+
+    public Point addVec(Point p1, Point p2) {
+        return new Point(p1.x + p2.x, p1.y + p2.y, p1.z + p2.z);
+    }
+    public Point subVec(Point p1, Point p2) {
+        return new Point(p1.x - p2.x, p1.y - p2.y, p1.z - p2.z);
+    }
+
+    public Point multVec(Point p1, double p2) {
+        return new Point(p1.x * p2, p1.y * p2, p1.z * p2);
+    }
+    public Point divVec(Point p1, double p2) {
+        return new Point(p1.x / p2, p1.y / p2, p1.z / p2);
+    }
+
+    public double dotProduct(Point p1, Point p2) {
+        return p1.x*p2.x + p1.y*p2.y + p1.z*p2.z;
+    }
+    public double vecLength(Point p1) {
+        return Math.sqrt(p1.x*p1.x + p1.y*p1.y + p1.z*p1.z);
+    }
+    public Point vecNormalise(Point p1) {
+        double l = vecLength(p1);
+        return new Point(p1.x/l, p1.y/l, p1.z/l);
+    }
+    public Point crossProduct(Point p1, Point p2) {
+        Point cp = new Point(0, 0, 0);
+        cp.x = p1.y*p2.z - p1.z*p2.y;
+        cp.y = p1.z*p2.x - p1.x*p2.z;
+        cp.z = p1.x*p2.y - p1.y*p2.x;
+        return cp;
+    }
 
     public void paintComponent(Graphics g) {
         super.paintComponent(g);
@@ -101,76 +170,44 @@ public class Panel extends JPanel implements ActionListener {
         }
 
         int zSpeed = 25;
-        //rotation z
-        double[][] rotZ = new double[4][4]; //usually 3x3 but can extend to 4x4 easily
-        rotZ[0][0] = Math.cos(time/zSpeed);
-        rotZ[0][1] = -1*Math.sin(time/zSpeed);
-        rotZ[1][0] = Math.sin(time/zSpeed);
-        rotZ[1][1] = Math.cos(time/zSpeed);
-        rotZ[2][2] = 1;
-        rotZ[3][3] = 1;
-        //rotation x
         int xSpeed = 30;
-        double[][] rotX = new double[4][4];
-        rotX[0][0] = 1;
-        rotX[1][1] = Math.cos(time/xSpeed); //1/2 to make the rotation rates different - avoid gimbal lock :(
-        rotX[1][2] = -1*Math.sin(time/xSpeed);
-        rotX[2][1] = Math.sin(time/xSpeed);
-        rotX[2][2] = Math.cos(time/xSpeed);
-        rotX[3][3] = 1;
 
         ArrayList<Triangle> trisToDraw = new ArrayList<Triangle>();
 
+        double[][] worldMat = multiplyMat(matRotZ(time/zSpeed), matRotX(time/xSpeed));
+        worldMat = multiplyMat(worldMat, matTranslation(0, 0, 10));
+
         //draw triangles
         for (Triangle t : meshCube.tris) {
-            //rotate the triangle!
-            Triangle tZRot = new Triangle(multiplyVectMat(t.point1, rotZ),
-                    multiplyVectMat(t.point2, rotZ), multiplyVectMat(t.point3, rotZ));
-            Triangle tZXRot = new Triangle(multiplyVectMat(tZRot.point1, rotX),
-                    multiplyVectMat(tZRot.point2, rotX), multiplyVectMat(tZRot.point3, rotX));
 
-            //translating it!
-            Triangle tTranslated = new Triangle(tZXRot.point1, tZXRot.point2, tZXRot.point3);
-            tTranslated.point1.z += 10;
-            tTranslated.point2.z += 10;
-            tTranslated.point3.z += 10;
+            Triangle tTransformed = new Triangle(multiplyVectMat(t.point1, worldMat),
+                    multiplyVectMat(t.point2, worldMat), multiplyVectMat(t.point3, worldMat));
 
             //triangle culling
             Point normal, line1, line2; //actually 3D vectors but I'm too lazy to make a new class
-            line1 = new Point(tTranslated.point2.x - tTranslated.point1.x, tTranslated.point2.y - tTranslated.point1.y, tTranslated.point2.z - tTranslated.point1.z);
-            line2 = new Point(tTranslated.point3.x - tTranslated.point1.x, tTranslated.point3.y - tTranslated.point1.y, tTranslated.point3.z - tTranslated.point1.z);
-            normal = new Point(line1.y*line2.z - line1.z*line2.y, line1.z*line2.x - line1.x*line2.z, line1.x*line2.y - line1.y*line2.x);
-            double normal_l = Math.sqrt(normal.x*normal.x + normal.y*normal.y + normal.z*normal.z);
-            normal.x /= normal_l;
-            normal.y /= normal_l;
-            normal.z /= normal_l;
+            line1 = subVec(tTransformed.point2, tTransformed.point1);
+            line2 = subVec(tTransformed.point3, tTransformed.point1);
+            normal = vecNormalise(crossProduct(line1, line2));
 
             //if(true) {
-            if (normal.x*(tTranslated.point1.x - camera.x) + normal.y*(tTranslated.point1.y - camera.y) +
-                    normal.z*(tTranslated.point1.z - camera.z) < 0) { //takes into account perspective w/ dot product
+            if (dotProduct(normal, subVec(tTransformed.point1, camera)) < 0) { //takes into account perspective w/ dot product
                 //add lighting
-                Point light_direction = new Point(0, 0, -1); //single direction, very simple because it's just a huge plane
+                Point light_direction = vecNormalise(new Point(0, 0, -1)); //single direction, very simple because it's just a huge plane
                 //emitting consistent rays of light which is great because I small brain also IntelliJ I'm sorry but you'll never be Grammarly
-                double light_l = Math.sqrt(light_direction.x*normal.x + light_direction.y*light_direction.y + light_direction.z*light_direction.z);
-                light_direction.x /= light_l;
-                light_direction.y /= light_l;
-                light_direction.z /= light_l;
-                double dp = light_direction.x*normal.x + light_direction.y*normal.y + light_direction.z*normal.z;
-                if (dp < 0) {
-                    dp = 0;
-                }
+                //also used normalise because it isn't always gonna be simple like that
+
+                double dp = Math.max(0.1, dotProduct(light_direction, normal));
                 Color c = new Color((float)dp, (float)dp, (float)dp);
 
                 //projecting it!
-                Triangle tProjected = new Triangle(multiplyVectMat(tTranslated.point1, projectionMatrix),
-                        multiplyVectMat(tTranslated.point2, projectionMatrix), multiplyVectMat(tTranslated.point3, projectionMatrix));
-                //scale!
-                tProjected.point1.x += 1;
-                tProjected.point1.y += 1;
-                tProjected.point2.x += 1;
-                tProjected.point2.y += 1;
-                tProjected.point3.x += 1;
-                tProjected.point3.y += 1;
+                Triangle tProjected = new Triangle(multiplyVectMat(tTransformed.point1, projectionMatrix),
+                        multiplyVectMat(tTransformed.point2, projectionMatrix), multiplyVectMat(tTransformed.point3, projectionMatrix));
+
+                //offset and scale
+                Point addP = new Point(1,1, 0);
+                tProjected.point1 = addVec(tProjected.point1, addP);
+                tProjected.point2 = addVec(tProjected.point2, addP);
+                tProjected.point3 = addVec(tProjected.point3, addP);
 
                 tProjected.point1.x *= 0.5 * WIDTH;
                 tProjected.point1.y *= 0.5 * HEIGHT;
@@ -205,8 +242,8 @@ public class Panel extends JPanel implements ActionListener {
         for (Triangle t : trisToDraw) {
             g.setColor(t.c);
             fillTriangle(g, t);
-            //g.setColor(Color.WHITE);
-            //drawTriangle(g, tProjected);
+//            g.setColor(Color.WHITE);
+//            drawTriangle(g, t);
         }
     }
     public void drawTriangle(Graphics g, Triangle t) {
