@@ -19,6 +19,7 @@ public class Panel extends JPanel implements ActionListener {
     private final Mesh meshCube;
     private double[][] projectionMatrix; //multiply by the input point/vector to normalize it into the screen space!
     private Point camera;
+    private Point lookDir;
 
     public Panel() throws Exception {
         this.setPreferredSize(new Dimension(WIDTH, HEIGHT));
@@ -33,9 +34,10 @@ public class Panel extends JPanel implements ActionListener {
         projectionMatrix = matProjection(90,(double) HEIGHT/WIDTH, 0.1, 1000);
 
         camera = new Point(0, 0, 0);
+        lookDir = new Point(0, 0, 1);
 
         meshCube = new Mesh(new ArrayList<Triangle>());
-        meshCube.readObj("C:\\Users\\eydon\\IdeaProjects\\3DRendering\\src\\Cow.txt");
+        meshCube.readObj("C:\\Users\\eydon\\IdeaProjects\\3DRendering\\src\\Axis.txt");
     }
 
     public Point multiplyVectMat (Point i, double[][] m) {
@@ -154,13 +156,34 @@ public class Panel extends JPanel implements ActionListener {
         return cp;
     }
 
+    public double[][][] pointAt(Point pos, Point target, Point up) { //camera info!!
+        Point newForward = vecNormalise(subVec(target, pos));
+        Point newUp = vecNormalise(subVec(up, multVec(newForward, dotProduct(up, newForward)))); //how much does newForward affect up?
+        //just visualize the things graphically and it works out, if my linear-algebra-averse brain can do it, you can definitely do it!
+        Point newRight = crossProduct(newUp, newForward);
+
+        double[][] mat = new double[4][4]; //transformation matrix for looking at stuff
+        mat[0][0] = newRight.x; mat[0][1] = newRight.y; mat[0][2] = newRight.z;
+        mat[1][0] = newUp.x; mat[1][1] = newUp.y; mat[1][2] = newUp.z;
+        mat[2][0] = newForward.x; mat[2][1] = newForward.y; mat[2][2] = newForward.z;
+        mat[3][0] = pos.x; mat[3][1] = pos.y; mat[3][2] = pos.z; mat[3][3] = 1;
+
+        double[][] inverseMat = new double[4][4];
+        inverseMat[0][0] = newRight.x; inverseMat[1][0] = newRight.y; inverseMat[2][0] = newRight.z;
+        inverseMat[0][1] = newUp.x; inverseMat[1][1] = newUp.y; inverseMat[2][1] = newUp.z;
+        inverseMat[0][2] = newForward.x; inverseMat[1][2] = newForward.y; inverseMat[2][2] = newForward.z;
+        inverseMat[3][0] = -dotProduct(pos, newRight); inverseMat[3][1] = -dotProduct(pos, newUp); inverseMat[3][2] = -dotProduct(pos, newForward); inverseMat[3][3] = 1;
+
+        return new double[][][] {mat, inverseMat};
+    }
+
     public void paintComponent(Graphics g) {
         super.paintComponent(g);
 
         draw(g);
     }
     public void draw(Graphics g) {
-        betweenTime ++;
+        //betweenTime ++;
         if (betweenTime >= 10) {
             betweenTime = 0;
             time++;
@@ -177,6 +200,14 @@ public class Panel extends JPanel implements ActionListener {
         double[][] worldMat = multiplyMat(matRotZ(time/zSpeed), matRotX(time/xSpeed));
         worldMat = multiplyMat(worldMat, matTranslation(0, 0, 10));
 
+        double[][] camMat = pointAt(camera, addVec(camera, lookDir), new Point(0, 1, 0))[1];
+//        for (int r = 0; r < 4; r++) {
+//            for (int c = 0; c < 4; c++) {
+//                System.out.println("camMat " + r + " " + c + " " + camMat[r][c]);
+//            }
+//        }
+        //we need the inverse sorry og matrix
+
         //draw triangles
         for (Triangle t : meshCube.tris) {
 
@@ -191,17 +222,28 @@ public class Panel extends JPanel implements ActionListener {
 
             //if(true) {
             if (dotProduct(normal, subVec(tTransformed.point1, camera)) < 0) { //takes into account perspective w/ dot product
+
                 //add lighting
                 Point light_direction = vecNormalise(new Point(0, 0, -1)); //single direction, very simple because it's just a huge plane
                 //emitting consistent rays of light which is great because I small brain also IntelliJ I'm sorry but you'll never be Grammarly
                 //also used normalise because it isn't always gonna be simple like that
 
-                double dp = Math.max(0.1, dotProduct(light_direction, normal));
+                double dp = Math.max(0.2, dotProduct(light_direction, normal));
                 Color c = new Color((float)dp, (float)dp, (float)dp);
 
+                //converting world space to view space
+                Triangle tView = new Triangle(multiplyVectMat(tTransformed.point1, camMat),
+                        multiplyVectMat(tTransformed.point2, camMat), multiplyVectMat(tTransformed.point3, camMat));
+
+                //System.out.println("p1: " + tView.point1.x + " " + tView.point1.y + " " + tView.point1.z);
+                //System.out.println("p2: " + tView.point2.x + " " + tView.point2.y + " " + tView.point2.z);
+                //System.out.println("p3: " + tView.point3.x + " " + tView.point3.y + " " + tView.point3.z);
+
                 //projecting it!
-                Triangle tProjected = new Triangle(multiplyVectMat(tTransformed.point1, projectionMatrix),
-                        multiplyVectMat(tTransformed.point2, projectionMatrix), multiplyVectMat(tTransformed.point3, projectionMatrix));
+                //Triangle tProjected = new Triangle(multiplyVectMat(tTransformed.point1, projectionMatrix),
+                        //multiplyVectMat(tTransformed.point2, projectionMatrix), multiplyVectMat(tTransformed.point3, projectionMatrix));
+                Triangle tProjected = new Triangle(multiplyVectMat(tView.point1, projectionMatrix),
+                        multiplyVectMat(tView.point2, projectionMatrix), multiplyVectMat(tView.point3, projectionMatrix));
 
                 //offset and scale
                 Point addP = new Point(1,1, 0);
@@ -247,13 +289,13 @@ public class Panel extends JPanel implements ActionListener {
         }
     }
     public void drawTriangle(Graphics g, Triangle t) {
-        g.drawLine((int) t.point1.x, (int) t.point1.y, (int) t.point2.x, (int) t.point2.y);
-        g.drawLine((int) t.point1.x, (int) t.point1.y, (int) t.point3.x, (int) t.point3.y);
-        g.drawLine((int) t.point3.x, (int) t.point3.y, (int) t.point2.x, (int) t.point2.y);
+        g.drawLine(WIDTH-(int) t.point1.x, HEIGHT-(int) t.point1.y, WIDTH-(int) t.point2.x, HEIGHT-(int) t.point2.y);
+        g.drawLine(WIDTH-(int) t.point1.x, HEIGHT-(int) t.point1.y, WIDTH-(int) t.point3.x, HEIGHT-(int) t.point3.y);
+        g.drawLine(WIDTH-(int) t.point3.x, HEIGHT-(int) t.point3.y, WIDTH-(int) t.point2.x, HEIGHT-(int) t.point2.y);
     }
     public void fillTriangle(Graphics g, Triangle t) {
-        int[] x = {(int) t.point1.x, (int) t.point2.x, (int) t.point3.x};
-        int[] y = {(int) t.point1.y, (int) t.point2.y, (int) t.point3.y};
+        int[] x = {WIDTH-(int) t.point1.x, WIDTH-(int) t.point2.x, WIDTH-(int) t.point3.x};
+        int[] y = {HEIGHT-(int) t.point1.y, HEIGHT-(int) t.point2.y, HEIGHT-(int) t.point3.y};
         Polygon p = new Polygon(x, y, 3);
         g.fillPolygon(p);
     }
@@ -266,7 +308,20 @@ public class Panel extends JPanel implements ActionListener {
     public class GKeyAdapter extends KeyAdapter {
         @Override
         public void keyPressed(KeyEvent e) {
-
+            switch(e.getKeyCode()) {
+                case KeyEvent.VK_UP:
+                    camera.y += 3;
+                    break;
+                case KeyEvent.VK_DOWN:
+                    camera.y -= 3;
+                    break;
+                case KeyEvent.VK_RIGHT:
+                    camera.x -= 3;
+                    break;
+                case KeyEvent.VK_LEFT:
+                    camera.x += 3;
+                    break;
+            }
         }
         @Override
         public void keyReleased(KeyEvent e) {
@@ -304,26 +359,26 @@ public class Panel extends JPanel implements ActionListener {
                 ArrayList<Point> pool = new ArrayList<Point>();
                 while (s != null) {
                     StringTokenizer str = new StringTokenizer(s);
-                    String start = str.nextToken();
-                    if (start.equals("v")) {
-                        double x = Double.parseDouble(str.nextToken());
-                        double y = Double.parseDouble(str.nextToken());
-                        double z = Double.parseDouble(str.nextToken());
-                        pool.add(new Point(x, y, z));
-                    }
-                    else if (start.equals("f")) { //assume is triangle or quad for sanity
-                        int[] indices = new int[4];
-                        int i = 0;
-                        while (str.hasMoreTokens() && i < 4) {
-                            indices[i] = Integer.parseInt(str.nextToken());
-                            i++;
-                        }
-                        if (indices[3] == 0) {
-                            tris.add(new Triangle(pool.get(indices[0]-1), pool.get(indices[1]-1), pool.get(indices[2]-1)));
-                        }
-                        else {
-                            tris.add(new Triangle(pool.get(indices[0]-1), pool.get(indices[1]-1), pool.get(indices[2]-1)));
-                            tris.add(new Triangle(pool.get(indices[0]-1), pool.get(indices[2]-1), pool.get(indices[3]-1)));
+                    if (str.hasMoreTokens()) {
+                        String start = str.nextToken();
+                        if (start.equals("v")) {
+                            double x = Double.parseDouble(str.nextToken());
+                            double y = Double.parseDouble(str.nextToken());
+                            double z = Double.parseDouble(str.nextToken());
+                            pool.add(new Point(x, y, z));
+                        } else if (start.equals("f")) { //assume is triangle or quad for sanity
+                            int[] indices = new int[4];
+                            int i = 0;
+                            while (str.hasMoreTokens() && i < 4) {
+                                indices[i] = Integer.parseInt(str.nextToken());
+                                i++;
+                            }
+                            if (indices[3] == 0) {
+                                tris.add(new Triangle(pool.get(indices[0] - 1), pool.get(indices[1] - 1), pool.get(indices[2] - 1)));
+                            } else {
+                                tris.add(new Triangle(pool.get(indices[0] - 1), pool.get(indices[1] - 1), pool.get(indices[2] - 1)));
+                                tris.add(new Triangle(pool.get(indices[0] - 1), pool.get(indices[2] - 1), pool.get(indices[3] - 1)));
+                            }
                         }
                     }
                     s = in.readLine();
