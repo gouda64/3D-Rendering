@@ -20,6 +20,7 @@ public class Panel extends JPanel implements ActionListener {
     private double[][] projectionMatrix; //multiply by the input point/vector to normalize it into the screen space!
     private Point camera;
     private Point lookDir;
+    private double yaw;
 
     public Panel() throws Exception {
         this.setPreferredSize(new Dimension(WIDTH, HEIGHT));
@@ -35,6 +36,7 @@ public class Panel extends JPanel implements ActionListener {
 
         camera = new Point(0, 0, 0);
         lookDir = new Point(0, 0, 1);
+        yaw = 0;
 
         meshCube = new Mesh(new ArrayList<Triangle>());
         meshCube.readObj("C:\\Users\\eydon\\IdeaProjects\\3DRendering\\src\\Axis.txt");
@@ -200,6 +202,7 @@ public class Panel extends JPanel implements ActionListener {
         double[][] worldMat = multiplyMat(matRotZ(time/zSpeed), matRotX(time/xSpeed));
         worldMat = multiplyMat(worldMat, matTranslation(0, 0, 10));
 
+        lookDir = multiplyVectMat(new Point(0, 0, 1), matRotY(yaw));
         double[][] camMat = pointAt(camera, addVec(camera, lookDir), new Point(0, 1, 0))[1];
 //        for (int r = 0; r < 4; r++) {
 //            for (int c = 0; c < 4; c++) {
@@ -308,6 +311,7 @@ public class Panel extends JPanel implements ActionListener {
     public class GKeyAdapter extends KeyAdapter {
         @Override
         public void keyPressed(KeyEvent e) {
+
             switch(e.getKeyCode()) {
                 case KeyEvent.VK_UP:
                     camera.y += 3;
@@ -320,6 +324,18 @@ public class Panel extends JPanel implements ActionListener {
                     break;
                 case KeyEvent.VK_LEFT:
                     camera.x += 3;
+                    break;
+                case KeyEvent.VK_A:
+                    yaw -= 0.1;
+                    break;
+                case KeyEvent.VK_D:
+                    yaw += 0.1;
+                    break;
+                case KeyEvent.VK_W:
+                    camera = addVec(camera, multVec(lookDir, 3));
+                    break;
+                case KeyEvent.VK_S:
+                    camera = subVec(camera, multVec(lookDir, 3));
                     break;
             }
         }
