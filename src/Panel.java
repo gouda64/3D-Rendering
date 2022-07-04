@@ -32,11 +32,17 @@ public class Panel extends JPanel implements ActionListener {
         time = 0;
         betweenTime = 0;
 
-        projectionMatrix = matProjection(90,(double) HEIGHT/WIDTH, 0.1, 1000);
+        fov = 90;
+        projectionMatrix = matProjection(fov,(double) HEIGHT/WIDTH, 0.5, 1000);
 
         camera = new Point(0, 0, 0);
         lookDir = new Point(0, 0, 1);
         yaw = 0;
+
+        //ArrayList<Triangle> t = new ArrayList<Triangle>();
+        //t.add(new Triangle(new Point(10, 10, 10), new Point(20, 20, 10), new Point(30, 10, 10)));
+        //meshCube = new Mesh(t);
+        // for debugging (literally one triangle)
 
         meshCube = new Mesh(new ArrayList<Triangle>());
         meshCube.readObj("C:\\Users\\eydon\\IdeaProjects\\3DRendering\\src\\Axis.txt");
@@ -148,7 +154,12 @@ public class Panel extends JPanel implements ActionListener {
     }
     public Point vecNormalise(Point p1) {
         double l = vecLength(p1);
-        return new Point(p1.x/l, p1.y/l, p1.z/l);
+        if (l != 0) {
+            return new Point(p1.x/l, p1.y/l, p1.z/l);
+        }
+        else {
+            return p1;
+        }
     }
     public Point crossProduct(Point p1, Point p2) {
         Point cp = new Point(0, 0, 0);
@@ -156,6 +167,81 @@ public class Panel extends JPanel implements ActionListener {
         cp.y = p1.z*p2.x - p1.x*p2.z;
         cp.z = p1.x*p2.y - p1.y*p2.x;
         return cp;
+    }
+
+    public Point pointIntersectPlane(Point pPoint, Point pNormal, Point lStart, Point lEnd) {
+        pNormal = vecNormalise(pNormal);
+        double t = (dotProduct(pNormal, pPoint) - dotProduct(lStart, pNormal)) / (dotProduct(lEnd, pNormal) - dotProduct(lStart, pNormal));
+        //just something I found on stack overflow idk how it does it either
+        return addVec(lStart, multVec(subVec(lEnd, lStart), t));
+    }
+
+    public Triangle[] triClipToPlane(Point pPoint, Point pNormal, Triangle t) {
+        pNormal = vecNormalise(pNormal);
+        //signed shortest distance from point to plane
+        Point temp = t.point1;
+        //DON'T normalize temp messes everything up I know from the week I spent debugging this thing
+        double dist1 = pNormal.x*temp.x + pNormal.y*temp.y + pNormal.z*temp.z - dotProduct(pNormal, pPoint);
+        temp = t.point2;
+        double dist2 = dotProduct(pNormal, temp) - dotProduct(pNormal, pPoint);
+        temp = t.point3;
+        double dist3 = dotProduct(pNormal, temp)- dotProduct(pNormal, pPoint);
+        Point[] inside = new Point[3]; int inNum = 0;
+        Point[] outside = new Point[3]; int outNum = 0;
+
+        if (dist1 >= 0) {
+            inside[inNum] = t.point1;
+            inNum++;
+        }
+        else {
+            outside[outNum] = t.point1;
+            outNum++;
+        }
+        if (dist2 >= 0) {
+            inside[inNum] = t.point2;
+            inNum++;
+        }
+        else {
+            outside[outNum] = t.point2;
+            outNum++;
+        }
+        if (dist3 >= 0) {
+            inside[inNum] = t.point3;
+            inNum++;
+        }
+        else {
+            outside[outNum] = t.point3;
+            outNum++;
+        }
+
+        if (inNum == 0) {
+            return new Triangle[] {};
+        }
+        else if (inNum == 3) {
+            return new Triangle[] {t};
+        }
+        else if (inNum == 1) {
+            Triangle newT = new Triangle(null, null, null);
+            newT.point1 = inside[0];
+            newT.point2 = pointIntersectPlane(pPoint, pNormal, inside[0], outside[0]);
+            newT.point3 = pointIntersectPlane(pPoint, pNormal, inside[0], outside[1]);
+
+            return new Triangle[] {newT};
+        }
+        else {
+            Triangle newT1 = new Triangle(null, null, null);
+            Triangle newT2 = new Triangle(null, null, null);
+
+            newT1.point1 = inside[0];
+            newT1.point2 = inside[1];
+            newT1.point3 = pointIntersectPlane(pPoint, pNormal, inside[0], outside[0]);
+
+            newT2.point1 = inside[1];
+            newT2.point2 = pointIntersectPlane(pPoint, pNormal, inside[0], outside[0]);
+            newT2.point3 = pointIntersectPlane(pPoint, pNormal, inside[1], outside[0]);
+
+            return new Triangle[] {newT1, newT2};
+        }
     }
 
     public double[][][] pointAt(Point pos, Point target, Point up) { //camera info!!
@@ -204,12 +290,7 @@ public class Panel extends JPanel implements ActionListener {
 
         lookDir = multiplyVectMat(new Point(0, 0, 1), matRotY(yaw));
         double[][] camMat = pointAt(camera, addVec(camera, lookDir), new Point(0, 1, 0))[1];
-//        for (int r = 0; r < 4; r++) {
-//            for (int c = 0; c < 4; c++) {
-//                System.out.println("camMat " + r + " " + c + " " + camMat[r][c]);
-//            }
-//        }
-        //we need the inverse sorry og matrix
+        //we need the inverse!! not the og, emphasis on the [1]
 
         //draw triangles
         for (Triangle t : meshCube.tris) {
@@ -231,38 +312,36 @@ public class Panel extends JPanel implements ActionListener {
                 //emitting consistent rays of light which is great because I small brain also IntelliJ I'm sorry but you'll never be Grammarly
                 //also used normalise because it isn't always gonna be simple like that
 
-                double dp = Math.max(0.2, dotProduct(light_direction, normal));
+                double dp = Math.max(0.3, dotProduct(light_direction, normal));
                 Color c = new Color((float)dp, (float)dp, (float)dp);
 
                 //converting world space to view space
                 Triangle tView = new Triangle(multiplyVectMat(tTransformed.point1, camMat),
                         multiplyVectMat(tTransformed.point2, camMat), multiplyVectMat(tTransformed.point3, camMat));
 
-                //System.out.println("p1: " + tView.point1.x + " " + tView.point1.y + " " + tView.point1.z);
-                //System.out.println("p2: " + tView.point2.x + " " + tView.point2.y + " " + tView.point2.z);
-                //System.out.println("p3: " + tView.point3.x + " " + tView.point3.y + " " + tView.point3.z);
+                Triangle[] clippedTris = triClipToPlane(new Point(0, 0, 0.2), new Point(0, 0, 1), tView);
+                for (int n = 0; n < clippedTris.length; n++) {
 
-                //projecting it!
-                //Triangle tProjected = new Triangle(multiplyVectMat(tTransformed.point1, projectionMatrix),
-                        //multiplyVectMat(tTransformed.point2, projectionMatrix), multiplyVectMat(tTransformed.point3, projectionMatrix));
-                Triangle tProjected = new Triangle(multiplyVectMat(tView.point1, projectionMatrix),
-                        multiplyVectMat(tView.point2, projectionMatrix), multiplyVectMat(tView.point3, projectionMatrix));
+                    Triangle tProjected = new Triangle(multiplyVectMat(clippedTris[n].point1, projectionMatrix),
+                            multiplyVectMat(clippedTris[n].point2, projectionMatrix), multiplyVectMat(clippedTris[n].point3, projectionMatrix));
 
-                //offset and scale
-                Point addP = new Point(1,1, 0);
-                tProjected.point1 = addVec(tProjected.point1, addP);
-                tProjected.point2 = addVec(tProjected.point2, addP);
-                tProjected.point3 = addVec(tProjected.point3, addP);
+                    //offset and scale
+                    Point addP = new Point(1, 1, 0);
+                    tProjected.point1 = addVec(tProjected.point1, addP);
+                    tProjected.point2 = addVec(tProjected.point2, addP);
+                    tProjected.point3 = addVec(tProjected.point3, addP);
 
-                tProjected.point1.x *= 0.5 * WIDTH;
-                tProjected.point1.y *= 0.5 * HEIGHT;
-                tProjected.point2.x *= 0.5 * WIDTH;
-                tProjected.point2.y *= 0.5 * HEIGHT;
-                tProjected.point3.x *= 0.5 * WIDTH;
-                tProjected.point3.y *= 0.5 * HEIGHT;
+                    tProjected.point1.x *= 0.5 * WIDTH;
+                    tProjected.point1.y *= 0.5 * HEIGHT;
+                    tProjected.point2.x *= 0.5 * WIDTH;
+                    tProjected.point2.y *= 0.5 * HEIGHT;
+                    tProjected.point3.x *= 0.5 * WIDTH;
+                    tProjected.point3.y *= 0.5 * HEIGHT;
 
-                tProjected.c = c;
-                trisToDraw.add(tProjected);
+                    tProjected.c = c;
+
+                    trisToDraw.add(tProjected);
+                }
             }
         }
 
@@ -274,12 +353,13 @@ public class Panel extends JPanel implements ActionListener {
                 if (z1-z2 < 0) {
                     return 1;
                 }
-                else if (z1-z2 == 0) {
+                if (z1-z2 == 0) {
                     return 0;
                 }
-                else {
+                if (z1-z2 > 0){
                     return -1;
                 }
+                return 0;
             }
         };
         Collections.sort(trisToDraw, compareByZ);
@@ -287,8 +367,8 @@ public class Panel extends JPanel implements ActionListener {
         for (Triangle t : trisToDraw) {
             g.setColor(t.c);
             fillTriangle(g, t);
-//            g.setColor(Color.WHITE);
-//            drawTriangle(g, t);
+            //g.setColor(Color.WHITE);
+            //drawTriangle(g, t);
         }
     }
     public void drawTriangle(Graphics g, Triangle t) {
@@ -360,6 +440,12 @@ public class Panel extends JPanel implements ActionListener {
             point2 = p2;
             point3 = p3;
             c = new Color(0, 0, 0);
+        }
+
+        public String toString() {
+            return "p1 - x: " + point1.x + " y: " + point1.y + " z: " + point1.z +
+                    "\n p2 - x: " + point2.x + " y: " + point2.y + " z: " + point2.z +
+                    "\n p3 - x: " + point3.x + " y: " + point3.y + " z: " + point3.z;
         }
     }
     public class Mesh {
