@@ -55,7 +55,7 @@ public class Panel extends JPanel {
         // for debugging (literally one triangle)
 
         meshCube = new Mesh(new ArrayList<Triangle>());
-        meshCube.readObj("C:\\Users\\eydon\\IdeaProjects\\3DRendering\\src\\Axis.txt");
+        meshCube.readObj("./src/Axis.txt");
     }
 
     public Point multiplyVectMat (Point i, double[][] m) {
@@ -447,10 +447,10 @@ public class Panel extends JPanel {
                 case KeyEvent.VK_SHIFT:
                     camera.y -= 1;
                     break;
-                case KeyEvent.VK_A:
+                case KeyEvent.VK_D:
                     camera = addVec(camera, multVec(crossProduct(lookDir, new Point(0, 1, 0)), 2));
                     break;
-                case KeyEvent.VK_D:
+                case KeyEvent.VK_A:
                     camera = addVec(camera, multVec(crossProduct(lookDir, new Point(0, 1, 0)), -2));
                     break;
                 case KeyEvent.VK_W:
@@ -458,6 +458,18 @@ public class Panel extends JPanel {
                     break;
                 case KeyEvent.VK_S:
                     camera = subVec(camera, multVec(lookDir, 2));
+                    break;
+                case KeyEvent.VK_LEFT:
+                    yaw -= 0.1;
+                    break;
+                case KeyEvent.VK_RIGHT:
+                    yaw += 0.1;
+                    break;
+                case KeyEvent.VK_UP:
+                    pitch += 0.1;
+                    break;
+                case KeyEvent.VK_DOWN:
+                    pitch -= 0.1;
                     break;
             }
             repaint();
@@ -550,7 +562,7 @@ public class Panel extends JPanel {
                 return true;
             }
             catch (Exception e) {
-                System.out.println(":(");
+                System.out.println("readObj failed");
                 return false;
             }
         }
