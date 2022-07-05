@@ -4,7 +4,7 @@ import java.awt.event.*;
 import java.util.*;
 import java.io.*;
 
-public class Panel extends JPanel implements ActionListener {
+public class Panel extends JPanel {
     static final int WIDTH = 1200;
     static final int HEIGHT = 600;
     double time;
@@ -20,14 +20,19 @@ public class Panel extends JPanel implements ActionListener {
     private double[][] projectionMatrix; //multiply by the input point/vector to normalize it into the screen space!
     private Point camera;
     private Point lookDir;
-    private double yaw;
+    private double yaw; //basically left-right rotation
+    private double pitch; //up-down rotations
+    private int mouseX;
+    private int mouseY;
+    private boolean firstMove;
 
-    public Panel() throws Exception {
+    public Panel() {
         this.setPreferredSize(new Dimension(WIDTH, HEIGHT));
         this.setLayout(null);
         this.setBackground(Color.BLACK);
         this.setFocusable(true);
         this.addKeyListener(new GKeyAdapter());
+        this.addMouseMotionListener(new GMouseAdapter());
 
         time = 0;
         betweenTime = 0;
@@ -38,6 +43,11 @@ public class Panel extends JPanel implements ActionListener {
         camera = new Point(0, 0, 0);
         lookDir = new Point(0, 0, 1);
         yaw = 0;
+        pitch = 0;
+
+        mouseX = 0;
+        mouseY = 0;
+        firstMove = true;
 
         //ArrayList<Triangle> t = new ArrayList<Triangle>();
         //t.add(new Triangle(new Point(10, 10, 10), new Point(20, 20, 10), new Point(30, 10, 10)));
@@ -226,6 +236,8 @@ public class Panel extends JPanel implements ActionListener {
             newT.point2 = pointIntersectPlane(pPoint, pNormal, inside[0], outside[0]);
             newT.point3 = pointIntersectPlane(pPoint, pNormal, inside[0], outside[1]);
 
+            newT.c = t.c; //you can set this and the two below to different colors for a nice demonstration of clipping
+
             return new Triangle[] {newT};
         }
         else {
@@ -239,6 +251,9 @@ public class Panel extends JPanel implements ActionListener {
             newT2.point1 = inside[1];
             newT2.point2 = pointIntersectPlane(pPoint, pNormal, inside[0], outside[0]);
             newT2.point3 = pointIntersectPlane(pPoint, pNormal, inside[1], outside[0]);
+
+            newT1.c = t.c;
+            newT2.c = t.c;
 
             return new Triangle[] {newT1, newT2};
         }
@@ -278,6 +293,7 @@ public class Panel extends JPanel implements ActionListener {
             if (time == Double.MAX_VALUE) {
                 time = 0;
             }
+            repaint();
         }
 
         int zSpeed = 25;
@@ -289,6 +305,7 @@ public class Panel extends JPanel implements ActionListener {
         worldMat = multiplyMat(worldMat, matTranslation(0, 0, 10));
 
         lookDir = multiplyVectMat(new Point(0, 0, 1), matRotY(yaw));
+        lookDir = multiplyVectMat(lookDir, matRotX(pitch));
         double[][] camMat = pointAt(camera, addVec(camera, lookDir), new Point(0, 1, 0))[1];
         //we need the inverse!! not the og, emphasis on the [1]
 
@@ -309,10 +326,9 @@ public class Panel extends JPanel implements ActionListener {
 
                 //add lighting
                 Point light_direction = vecNormalise(new Point(0, 0, -1)); //single direction, very simple because it's just a huge plane
-                //emitting consistent rays of light which is great because I small brain also IntelliJ I'm sorry but you'll never be Grammarly
-                //also used normalise because it isn't always gonna be simple like that
+                //emitting consistent rays of light which is great because it's easy
 
-                double dp = Math.max(0.3, dotProduct(light_direction, normal));
+                double dp = Math.max(0.25, dotProduct(light_direction, normal));
                 Color c = new Color((float)dp, (float)dp, (float)dp);
 
                 //converting world space to view space
@@ -365,10 +381,47 @@ public class Panel extends JPanel implements ActionListener {
         Collections.sort(trisToDraw, compareByZ);
 
         for (Triangle t : trisToDraw) {
-            g.setColor(t.c);
-            fillTriangle(g, t);
-            //g.setColor(Color.WHITE);
-            //drawTriangle(g, t);
+            //clip triangles against screen edges
+            ArrayList<Triangle> trisToClip = new ArrayList<Triangle>();
+            trisToClip.add(t);
+
+            int newTris = 1;
+            for (int i = 0; i < 4; i++) {
+
+                while (newTris > 0) {
+                    Triangle test = trisToClip.remove(0);
+                    newTris--;
+                    Triangle[] clippedTris = new Triangle[1];
+
+                    switch(i) {
+                        case 0: //top
+                            clippedTris = triClipToPlane(new Point(0, 0, 0), new Point(0, 1, 0), test);
+                            break;
+                        case 1: //bottom
+                            clippedTris = triClipToPlane(new Point(0, HEIGHT-1, 0), new Point(0, -1, 0), test);
+                            break;
+                        case 2: //left
+                            clippedTris = triClipToPlane(new Point(0, 0, 0), new Point(1, 0, 0), test);
+                            break;
+                        case 3: //right
+                            clippedTris = triClipToPlane(new Point(WIDTH-1, 0, 0), new Point(-1, 0, 0), test);
+                            break;
+                    }
+
+                    for (Triangle n : clippedTris) {
+                        trisToClip.add(n);
+                    }
+                }
+                newTris = trisToClip.size();
+            }
+
+            //just to clarify it's called trisToClip but they're done clipping at this point
+            for (Triangle r : trisToClip) {
+                g.setColor(r.c);
+                fillTriangle(g, r);
+                //g.setColor(Color.WHITE);
+                //drawTriangle(g, t);
+            }
         }
     }
     public void drawTriangle(Graphics g, Triangle t) {
@@ -383,47 +436,55 @@ public class Panel extends JPanel implements ActionListener {
         g.fillPolygon(p);
     }
 
-    @Override
-    public void actionPerformed(ActionEvent e) {
-        repaint();
-    }
-
     public class GKeyAdapter extends KeyAdapter {
         @Override
         public void keyPressed(KeyEvent e) {
 
             switch(e.getKeyCode()) {
-                case KeyEvent.VK_UP:
-                    camera.y += 3;
+                case KeyEvent.VK_SPACE:
+                    camera.y += 1;
                     break;
-                case KeyEvent.VK_DOWN:
-                    camera.y -= 3;
-                    break;
-                case KeyEvent.VK_RIGHT:
-                    camera.x -= 3;
-                    break;
-                case KeyEvent.VK_LEFT:
-                    camera.x += 3;
+                case KeyEvent.VK_SHIFT:
+                    camera.y -= 1;
                     break;
                 case KeyEvent.VK_A:
-                    yaw -= 0.1;
+                    camera = addVec(camera, multVec(crossProduct(lookDir, new Point(0, 1, 0)), 2));
                     break;
                 case KeyEvent.VK_D:
-                    yaw += 0.1;
+                    camera = addVec(camera, multVec(crossProduct(lookDir, new Point(0, 1, 0)), -2));
                     break;
                 case KeyEvent.VK_W:
-                    camera = addVec(camera, multVec(lookDir, 3));
+                    camera = addVec(camera, multVec(lookDir, 2));
                     break;
                 case KeyEvent.VK_S:
-                    camera = subVec(camera, multVec(lookDir, 3));
+                    camera = subVec(camera, multVec(lookDir, 2));
                     break;
             }
+            repaint();
         }
         @Override
         public void keyReleased(KeyEvent e) {
 
         }
     }
+
+    public class GMouseAdapter extends MouseAdapter {
+        @Override
+        public void mouseMoved(MouseEvent e) {
+            if (!firstMove) {
+                pitch -= 0.005*(e.getYOnScreen() - mouseY);
+                yaw += 0.005*(e.getXOnScreen() - mouseX);
+            }
+            else {
+                firstMove = false;
+            }
+            mouseX = e.getXOnScreen();
+            mouseY = e.getYOnScreen();
+
+            repaint();
+        }
+    }
+
     public class Point {
         double x, y, z;
         public Point(double x, double y, double z) {
@@ -442,7 +503,7 @@ public class Panel extends JPanel implements ActionListener {
             c = new Color(0, 0, 0);
         }
 
-        public String toString() {
+        public String toString() { //for debugging!
             return "p1 - x: " + point1.x + " y: " + point1.y + " z: " + point1.z +
                     "\n p2 - x: " + point2.x + " y: " + point2.y + " z: " + point2.z +
                     "\n p3 - x: " + point3.x + " y: " + point3.y + " z: " + point3.z;
@@ -454,8 +515,8 @@ public class Panel extends JPanel implements ActionListener {
             tris = t;
         }
 
-        public boolean readObj(String fileName) throws Exception {
-            //try {
+        public boolean readObj(String fileName) {
+            try {
                 BufferedReader in = new BufferedReader(new FileReader(fileName));
                 String s = in.readLine();
                 ArrayList<Point> pool = new ArrayList<Point>();
@@ -487,11 +548,11 @@ public class Panel extends JPanel implements ActionListener {
                 }
                 in.close();
                 return true;
-            //}
-            //catch (Exception e) {
-                //System.out.println(":(");
-                //return false;
-            //}
+            }
+            catch (Exception e) {
+                System.out.println(":(");
+                return false;
+            }
         }
     }
 }

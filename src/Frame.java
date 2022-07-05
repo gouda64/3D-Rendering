@@ -3,7 +3,7 @@ import java.awt.*;
 import java.awt.event.*;
 
 public class Frame extends JFrame {
-    public Frame() throws Exception {
+    public Frame() {
         this.setTitle("3D");
         this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         this.setResizable(false);
@@ -13,13 +13,9 @@ public class Frame extends JFrame {
         this.pack();
         this.setLocationRelativeTo(null);
         this.setVisible(true);
-
-        while (true) {
-            p.repaint();
-        }
     }
 
-    public static void main(String[] args) throws Exception {
+    public static void main(String[] args) {
         new Frame();
     }
 }
