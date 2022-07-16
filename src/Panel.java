@@ -54,8 +54,8 @@ public class Panel extends JPanel {
         //meshCube = new Mesh(t);
         // for debugging (literally one triangle)
 
-        meshCube = new Mesh(new ArrayList<Triangle>());
-        meshCube.readObj("./src/Axis.txt");
+        meshCube = new Mesh(new ArrayList<>());
+        meshCube.readObj("./src/Mountains.txt");
     }
 
     public Point multiplyVectMat (Point i, double[][] m) {
@@ -299,7 +299,7 @@ public class Panel extends JPanel {
         int zSpeed = 25;
         int xSpeed = 30;
 
-        ArrayList<Triangle> trisToDraw = new ArrayList<Triangle>();
+        ArrayList<Triangle> trisToDraw = new ArrayList<>();
 
         double[][] worldMat = multiplyMat(matRotZ(time/zSpeed), matRotX(time/xSpeed));
         worldMat = multiplyMat(worldMat, matTranslation(0, 0, 10));
@@ -336,10 +336,10 @@ public class Panel extends JPanel {
                         multiplyVectMat(tTransformed.point2, camMat), multiplyVectMat(tTransformed.point3, camMat));
 
                 Triangle[] clippedTris = triClipToPlane(new Point(0, 0, 0.2), new Point(0, 0, 1), tView);
-                for (int n = 0; n < clippedTris.length; n++) {
+                for (Triangle tris : clippedTris) {
 
-                    Triangle tProjected = new Triangle(multiplyVectMat(clippedTris[n].point1, projectionMatrix),
-                            multiplyVectMat(clippedTris[n].point2, projectionMatrix), multiplyVectMat(clippedTris[n].point3, projectionMatrix));
+                    Triangle tProjected = new Triangle(multiplyVectMat(tris.point1, projectionMatrix),
+                            multiplyVectMat(tris.point2, projectionMatrix), multiplyVectMat(tris.point3, projectionMatrix));
 
                     //offset and scale
                     Point addP = new Point(1, 1, 0);
@@ -361,28 +361,25 @@ public class Panel extends JPanel {
             }
         }
 
-        Comparator<Triangle> compareByZ = new Comparator<Triangle>() {
-            @Override
-            public int compare(Triangle o1, Triangle o2) {
-                double z1 = (o1.point1.z + o1.point2.z + o1.point3.z)/3;
-                double z2 = (o2.point1.z + o2.point2.z + o2.point3.z)/3;
-                if (z1-z2 < 0) {
-                    return 1;
-                }
-                if (z1-z2 == 0) {
-                    return 0;
-                }
-                if (z1-z2 > 0){
-                    return -1;
-                }
+        Comparator<Triangle> compareByZ = (o1, o2) -> {
+            double z1 = (o1.point1.z + o1.point2.z + o1.point3.z)/3;
+            double z2 = (o2.point1.z + o2.point2.z + o2.point3.z)/3;
+            if (z1-z2 < 0) {
+                return 1;
+            }
+            if (z1-z2 == 0) {
                 return 0;
             }
+            if (z1-z2 > 0){
+                return -1;
+            }
+            return 0;
         };
-        Collections.sort(trisToDraw, compareByZ);
+        trisToDraw.sort(compareByZ);
 
         for (Triangle t : trisToDraw) {
             //clip triangles against screen edges
-            ArrayList<Triangle> trisToClip = new ArrayList<Triangle>();
+            ArrayList<Triangle> trisToClip = new ArrayList<>();
             trisToClip.add(t);
 
             int newTris = 1;
@@ -391,26 +388,19 @@ public class Panel extends JPanel {
                 while (newTris > 0) {
                     Triangle test = trisToClip.remove(0);
                     newTris--;
-                    Triangle[] clippedTris = new Triangle[1];
+                    Triangle[] clippedTris = switch (i) {
+                        case 0 -> //top
+                                triClipToPlane(new Point(0, 0, 0), new Point(0, 1, 0), test);
+                        case 1 -> //bottom
+                                triClipToPlane(new Point(0, HEIGHT - 1, 0), new Point(0, -1, 0), test);
+                        case 2 -> //left
+                                triClipToPlane(new Point(0, 0, 0), new Point(1, 0, 0), test);
+                        case 3 -> //right
+                                triClipToPlane(new Point(WIDTH - 1, 0, 0), new Point(-1, 0, 0), test);
+                        default -> new Triangle[1];
+                    };
 
-                    switch(i) {
-                        case 0: //top
-                            clippedTris = triClipToPlane(new Point(0, 0, 0), new Point(0, 1, 0), test);
-                            break;
-                        case 1: //bottom
-                            clippedTris = triClipToPlane(new Point(0, HEIGHT-1, 0), new Point(0, -1, 0), test);
-                            break;
-                        case 2: //left
-                            clippedTris = triClipToPlane(new Point(0, 0, 0), new Point(1, 0, 0), test);
-                            break;
-                        case 3: //right
-                            clippedTris = triClipToPlane(new Point(WIDTH-1, 0, 0), new Point(-1, 0, 0), test);
-                            break;
-                    }
-
-                    for (Triangle n : clippedTris) {
-                        trisToClip.add(n);
-                    }
+                    Collections.addAll(trisToClip, clippedTris);
                 }
                 newTris = trisToClip.size();
             }
@@ -440,37 +430,17 @@ public class Panel extends JPanel {
         @Override
         public void keyPressed(KeyEvent e) {
 
-            switch(e.getKeyCode()) {
-                case KeyEvent.VK_SPACE:
-                    camera.y += 1;
-                    break;
-                case KeyEvent.VK_SHIFT:
-                    camera.y -= 1;
-                    break;
-                case KeyEvent.VK_D:
-                    camera = addVec(camera, multVec(crossProduct(lookDir, new Point(0, 1, 0)), 2));
-                    break;
-                case KeyEvent.VK_A:
-                    camera = addVec(camera, multVec(crossProduct(lookDir, new Point(0, 1, 0)), -2));
-                    break;
-                case KeyEvent.VK_W:
-                    camera = addVec(camera, multVec(lookDir, 2));
-                    break;
-                case KeyEvent.VK_S:
-                    camera = subVec(camera, multVec(lookDir, 2));
-                    break;
-                case KeyEvent.VK_LEFT:
-                    yaw -= 0.1;
-                    break;
-                case KeyEvent.VK_RIGHT:
-                    yaw += 0.1;
-                    break;
-                case KeyEvent.VK_UP:
-                    pitch += 0.1;
-                    break;
-                case KeyEvent.VK_DOWN:
-                    pitch -= 0.1;
-                    break;
+            switch (e.getKeyCode()) {
+                case KeyEvent.VK_SPACE -> camera.y += 1;
+                case KeyEvent.VK_SHIFT -> camera.y -= 1;
+                case KeyEvent.VK_D -> camera = addVec(camera, multVec(crossProduct(lookDir, new Point(0, 1, 0)), 2));
+                case KeyEvent.VK_A -> camera = addVec(camera, multVec(crossProduct(lookDir, new Point(0, 1, 0)), -2));
+                case KeyEvent.VK_W -> camera = addVec(camera, multVec(lookDir, 2));
+                case KeyEvent.VK_S -> camera = subVec(camera, multVec(lookDir, 2));
+                case KeyEvent.VK_LEFT -> yaw -= 0.1;
+                case KeyEvent.VK_RIGHT -> yaw += 0.1;
+                case KeyEvent.VK_UP -> pitch += 0.1;
+                case KeyEvent.VK_DOWN -> pitch -= 0.1;
             }
             repaint();
         }
@@ -531,7 +501,7 @@ public class Panel extends JPanel {
             try {
                 BufferedReader in = new BufferedReader(new FileReader(fileName));
                 String s = in.readLine();
-                ArrayList<Point> pool = new ArrayList<Point>();
+                ArrayList<Point> pool = new ArrayList<>();
                 while (s != null) {
                     StringTokenizer str = new StringTokenizer(s);
                     if (str.hasMoreTokens()) {
