@@ -1,6 +1,8 @@
+import javax.imageio.ImageIO;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
+import java.awt.image.*;
 import java.util.*;
 import java.io.*;
 
@@ -54,8 +56,40 @@ public class Panel extends JPanel {
         //meshCube = new Mesh(t);
         // for debugging (literally one triangle)
 
-        meshCube = new Mesh(new ArrayList<Triangle>());
-        meshCube.readObj("./src/Axis.txt");
+        ArrayList<Triangle> t = new ArrayList<>();
+        //always draw triangles in a clockwise fashion so that the normals aren't all wack
+
+        //South
+        t.add(new Triangle(new Point(0.0, 0.0, 0.0), new Point(0.0, 1.0, 0.0), new Point(1.0, 1.0, 0.0)));
+        t.add(new Triangle(new Point(0.0, 0.0, 0.0), new Point(1.0, 1.0, 0.0), new Point(1.0, 0.0, 0.0)));
+        //East
+        t.add(new Triangle(new Point(1.0, 0.0, 0.0), new Point(1.0, 1.0, 0.0), new Point(1.0, 1.0, 1.0)));
+        t.add(new Triangle(new Point(1.0, 0.0, 0.0), new Point(1.0, 1.0, 1.0), new Point(1.0, 0.0, 1.0)));
+        //North
+        t.add(new Triangle(new Point(1.0, 0.0, 1.0), new Point(1.0, 1.0, 1.0), new Point(0.0, 1.0, 1.0)));
+        t.add(new Triangle(new Point(1.0, 0.0, 1.0), new Point(0.0, 1.0, 1.0), new Point(0.0, 0.0, 1.0)));
+        //West
+        t.add(new Triangle(new Point(0.0, 0.0, 1.0), new Point(0.0, 1.0, 1.0), new Point(0.0, 1.0, 0.0)));
+        t.add(new Triangle(new Point(0.0, 0.0, 1.0), new Point(0.0, 1.0, 0.0), new Point(0.0, 0.0, 0.0)));
+        //Top
+        t.add(new Triangle(new Point(0.0, 1.0, 0.0), new Point(0.0, 1.0, 1.0), new Point(1.0, 1.0, 1.0)));
+        t.add(new Triangle(new Point(0.0, 1.0, 0.0), new Point(1.0, 1.0, 1.0), new Point(1.0, 1.0, 0.0)));
+        //Bottom
+        t.add(new Triangle(new Point(0.0, 0.0, 1.0), new Point(0.0, 0.0, 0.0), new Point(1.0, 0.0, 0.0)));
+        t.add(new Triangle(new Point(0.0, 0.0, 1.0), new Point(1.0, 0.0, 0.0), new Point(1.0, 0.0, 1.0)));
+
+        //each face will just have the entire texture thing
+        for (Triangle tri : t) {
+            tri.tPoints[0] = new TexPoint(0, 1);
+            tri.tPoints[1] = new TexPoint(0, 0);
+            tri.tPoints[2] = new TexPoint(1, 0);
+        }
+
+        //for testing (literally one cube)
+        meshCube = new Mesh(t);
+
+        //meshCube = new Mesh(new ArrayList<Triangle>());
+        //meshCube.readObj("./src/Axis.txt");
     }
 
     public Point multiplyVectMat (Point i, double[][] m) {
@@ -191,36 +225,44 @@ public class Panel extends JPanel {
         //signed shortest distance from point to plane
         Point temp = t.point1;
         //DON'T normalize temp messes everything up I know from the week I spent debugging this thing
-        double dist1 = pNormal.x*temp.x + pNormal.y*temp.y + pNormal.z*temp.z - dotProduct(pNormal, pPoint);
+        double dist1 = dotProduct(pNormal, temp) - dotProduct(pNormal, pPoint);
         temp = t.point2;
         double dist2 = dotProduct(pNormal, temp) - dotProduct(pNormal, pPoint);
         temp = t.point3;
         double dist3 = dotProduct(pNormal, temp)- dotProduct(pNormal, pPoint);
         Point[] inside = new Point[3]; int inNum = 0;
         Point[] outside = new Point[3]; int outNum = 0;
+        TexPoint[] insideTex = new TexPoint[3];
+        TexPoint[] outsideTex = new TexPoint[3];
 
         if (dist1 >= 0) {
             inside[inNum] = t.point1;
+            insideTex[inNum] = t.tPoints[0];
             inNum++;
         }
         else {
             outside[outNum] = t.point1;
+            outsideTex[outNum] = t.tPoints[0];
             outNum++;
         }
         if (dist2 >= 0) {
             inside[inNum] = t.point2;
+            insideTex[inNum] = t.tPoints[1];
             inNum++;
         }
         else {
             outside[outNum] = t.point2;
+            outsideTex[outNum] = t.tPoints[1];
             outNum++;
         }
         if (dist3 >= 0) {
             inside[inNum] = t.point3;
+            insideTex[inNum] = t.tPoints[2];
             inNum++;
         }
         else {
             outside[outNum] = t.point3;
+            outsideTex[outNum] = t.tPoints[2];
             outNum++;
         }
 
@@ -232,9 +274,18 @@ public class Panel extends JPanel {
         }
         else if (inNum == 1) {
             Triangle newT = new Triangle(null, null, null);
-            newT.point1 = inside[0];
+            newT.point1 = inside[0]; newT.tPoints[0] = insideTex[0];
             newT.point2 = pointIntersectPlane(pPoint, pNormal, inside[0], outside[0]);
             newT.point3 = pointIntersectPlane(pPoint, pNormal, inside[0], outside[1]);
+
+            double t1 = (dotProduct(pNormal, pPoint) - dotProduct(inside[0], pNormal)) / (dotProduct(outside[0], pNormal) - dotProduct(inside[0], pNormal));
+            //the same thing as inside pointIntersectPlane but it's too annoying to try to access it from outside
+            newT.tPoints[1].u = t1*(outsideTex[0].u - insideTex[0].u) + insideTex[0].u;
+            newT.tPoints[1].v = t1*(outsideTex[0].v - insideTex[0].v) + insideTex[0].v;
+
+            t1 = (dotProduct(pNormal, pPoint) - dotProduct(inside[0], pNormal)) / (dotProduct(outside[1], pNormal) - dotProduct(inside[0], pNormal));
+            newT.tPoints[2].u = t1*(outsideTex[1].u - insideTex[0].u) + insideTex[0].u;
+            newT.tPoints[2].v = t1*(outsideTex[1].v - insideTex[0].v) + insideTex[0].v;
 
             newT.c = t.c; //you can set this and the two below to different colors for a nice demonstration of clipping
 
@@ -248,9 +299,21 @@ public class Panel extends JPanel {
             newT1.point2 = inside[1];
             newT1.point3 = pointIntersectPlane(pPoint, pNormal, inside[0], outside[0]);
 
+            newT1.tPoints[0] = insideTex[0];
+            newT1.tPoints[1] = insideTex[1];
+            double t1 = (dotProduct(pNormal, pPoint) - dotProduct(inside[0], pNormal)) / (dotProduct(outside[0], pNormal) - dotProduct(inside[0], pNormal));
+            newT1.tPoints[2].u = t1*(outsideTex[0].u - insideTex[0].u) + insideTex[0].u;
+            newT1.tPoints[2].v = t1*(outsideTex[0].v - insideTex[0].v) + insideTex[0].v;
+
             newT2.point1 = inside[1];
             newT2.point2 = pointIntersectPlane(pPoint, pNormal, inside[0], outside[0]);
             newT2.point3 = pointIntersectPlane(pPoint, pNormal, inside[1], outside[0]);
+
+            newT2.tPoints[0] = insideTex[0];
+            newT2.tPoints[1] = insideTex[1];
+            t1 = (dotProduct(pNormal, pPoint) - dotProduct(inside[1], pNormal)) / (dotProduct(outside[0], pNormal) - dotProduct(inside[1], pNormal));
+            newT2.tPoints[2].u = t1*(outsideTex[0].u - insideTex[1].u) + insideTex[1].u;
+            newT2.tPoints[2].v = t1*(outsideTex[0].v - insideTex[1].v) + insideTex[1].v;
 
             newT1.c = t.c;
             newT2.c = t.c;
@@ -299,15 +362,13 @@ public class Panel extends JPanel {
         int zSpeed = 25;
         int xSpeed = 30;
 
-        ArrayList<Triangle> trisToDraw = new ArrayList<Triangle>();
+        ArrayList<Triangle> trisToDraw = new ArrayList<>();
 
         double[][] worldMat = multiplyMat(matRotZ(time/zSpeed), matRotX(time/xSpeed));
         worldMat = multiplyMat(worldMat, matTranslation(0, 0, 10));
 
-        lookDir = multiplyVectMat(new Point(0, 0, 1), matRotY(yaw));
-        lookDir = multiplyVectMat(lookDir, matRotX(pitch));
+        lookDir = multiplyVectMat(new Point(0, 0, 1), multiplyMat(matRotX(pitch), matRotY(yaw)));
         double[][] camMat = pointAt(camera, addVec(camera, lookDir), new Point(0, 1, 0))[1];
-        //we need the inverse!! not the og, emphasis on the [1]
 
         //draw triangles
         for (Triangle t : meshCube.tris) {
@@ -334,12 +395,24 @@ public class Panel extends JPanel {
                 //converting world space to view space
                 Triangle tView = new Triangle(multiplyVectMat(tTransformed.point1, camMat),
                         multiplyVectMat(tTransformed.point2, camMat), multiplyVectMat(tTransformed.point3, camMat));
+                tView.tPoints[0] = t.tPoints[0];
+                tView.tPoints[1] = t.tPoints[1];
+                tView.tPoints[2] = t.tPoints[2];
 
                 Triangle[] clippedTris = triClipToPlane(new Point(0, 0, 0.2), new Point(0, 0, 1), tView);
-                for (int n = 0; n < clippedTris.length; n++) {
+                for (Triangle tris : clippedTris) {
 
-                    Triangle tProjected = new Triangle(multiplyVectMat(clippedTris[n].point1, projectionMatrix),
-                            multiplyVectMat(clippedTris[n].point2, projectionMatrix), multiplyVectMat(clippedTris[n].point3, projectionMatrix));
+                    Triangle tProjected = new Triangle(multiplyVectMat(tris.point1, projectionMatrix),
+                            multiplyVectMat(tris.point2, projectionMatrix), multiplyVectMat(tris.point3, projectionMatrix));
+
+                    //in the case of JPanel, x and y are inverted so...
+                    //note that I didn't use multVec in this case because I didn't want to affect z
+                    tProjected.point1.x *= -1;
+                    tProjected.point1.y *= -1;
+                    tProjected.point2.x *= -1;
+                    tProjected.point2.y *= -1;
+                    tProjected.point3.x *= -1;
+                    tProjected.point3.y *= -1;
 
                     //offset and scale
                     Point addP = new Point(1, 1, 0);
@@ -355,34 +428,33 @@ public class Panel extends JPanel {
                     tProjected.point3.y *= 0.5 * HEIGHT;
 
                     tProjected.c = c;
+                    tProjected.tPoints = tris.tPoints;
 
                     trisToDraw.add(tProjected);
                 }
             }
         }
 
-        Comparator<Triangle> compareByZ = new Comparator<Triangle>() {
-            @Override
-            public int compare(Triangle o1, Triangle o2) {
-                double z1 = (o1.point1.z + o1.point2.z + o1.point3.z)/3;
-                double z2 = (o2.point1.z + o2.point2.z + o2.point3.z)/3;
-                if (z1-z2 < 0) {
-                    return 1;
-                }
-                if (z1-z2 == 0) {
-                    return 0;
-                }
-                if (z1-z2 > 0){
-                    return -1;
-                }
+        Comparator<Triangle> compareByZ = (o1, o2) -> {
+            double z1 = (o1.point1.z + o1.point2.z + o1.point3.z)/3;
+            double z2 = (o2.point1.z + o2.point2.z + o2.point3.z)/3;
+            if (z1-z2 < 0) {
+                return 1;
+            }
+            if (z1-z2 == 0) {
                 return 0;
             }
+            if (z1-z2 > 0){
+                return -1;
+            }
+            return 0;
         };
-        Collections.sort(trisToDraw, compareByZ);
+        trisToDraw.sort(compareByZ); //fun fact: although Collections.sort merely calls list.sort, it is still in use because Java places emphasis
+        //on backwards compatibility so that's why it's still around, but it's more efficient to call list.sort just to avoid the extra method call
 
         for (Triangle t : trisToDraw) {
             //clip triangles against screen edges
-            ArrayList<Triangle> trisToClip = new ArrayList<Triangle>();
+            ArrayList<Triangle> trisToClip = new ArrayList<>();
             trisToClip.add(t);
 
             int newTris = 1;
@@ -391,43 +463,51 @@ public class Panel extends JPanel {
                 while (newTris > 0) {
                     Triangle test = trisToClip.remove(0);
                     newTris--;
-                    Triangle[] clippedTris = new Triangle[1];
+                    Triangle[] clippedTris = switch (i) {
+                        case 0 -> //top
+                                triClipToPlane(new Point(0, 0, 0), new Point(0, 1, 0), test);
+                        case 1 -> //bottom
+                                triClipToPlane(new Point(0, HEIGHT - 1, 0), new Point(0, -1, 0), test);
+                        case 2 -> //left
+                                triClipToPlane(new Point(0, 0, 0), new Point(1, 0, 0), test);
+                        case 3 -> //right
+                                triClipToPlane(new Point(WIDTH - 1, 0, 0), new Point(-1, 0, 0), test);
+                        default -> new Triangle[1];
+                    };
 
-                    switch(i) {
-                        case 0: //top
-                            clippedTris = triClipToPlane(new Point(0, 0, 0), new Point(0, 1, 0), test);
-                            break;
-                        case 1: //bottom
-                            clippedTris = triClipToPlane(new Point(0, HEIGHT-1, 0), new Point(0, -1, 0), test);
-                            break;
-                        case 2: //left
-                            clippedTris = triClipToPlane(new Point(0, 0, 0), new Point(1, 0, 0), test);
-                            break;
-                        case 3: //right
-                            clippedTris = triClipToPlane(new Point(WIDTH-1, 0, 0), new Point(-1, 0, 0), test);
-                            break;
-                    }
-
-                    for (Triangle n : clippedTris) {
-                        trisToClip.add(n);
-                    }
+                    trisToClip.addAll(Arrays.asList(clippedTris));
                 }
                 newTris = trisToClip.size();
             }
 
             //just to clarify it's called trisToClip but they're done clipping at this point
             for (Triangle r : trisToClip) {
-                g.setColor(r.c);
-                fillTriangle(g, r);
-                //g.setColor(Color.WHITE);
-                //drawTriangle(g, t);
+//                for (TexPoint p : r.tPoints) {
+//                    System.out.println("u: " + p.u + " v: " + p.v);
+//                }
+
+                TexTriangle texT = new TexTriangle((int) r.point1.x, (int) r.point1.y, r.tPoints[0].u, r.tPoints[0].v,
+                        (int) r.point2.x, (int) r.point2.y, r.tPoints[1].u, r.tPoints[1].v,
+                        (int) r.point3.x, (int) r.point3.y, r.tPoints[2].u, r.tPoints[2].v);
+                try {
+                    texT.drawTexTri(g, ImageIO.read(new File("./src/rsz_cheese.jpg")));
+                }
+                catch (IOException e) {
+                    System.out.println("image read failed");
+                }
+
+//                g.setColor(r.c);
+//                fillTriangle(g, r);
+                g.setColor(Color.WHITE);
+                drawTriangle(g, r);
+
             }
         }
     }
     public void drawTriangle(Graphics g, Triangle t) {
-        g.drawLine(WIDTH-(int) t.point1.x, HEIGHT-(int) t.point1.y, WIDTH-(int) t.point2.x, HEIGHT-(int) t.point2.y);
-        g.drawLine(WIDTH-(int) t.point1.x, HEIGHT-(int) t.point1.y, WIDTH-(int) t.point3.x, HEIGHT-(int) t.point3.y);
-        g.drawLine(WIDTH-(int) t.point3.x, HEIGHT-(int) t.point3.y, WIDTH-(int) t.point2.x, HEIGHT-(int) t.point2.y);
+        g.drawLine((int) t.point1.x, (int) t.point1.y, (int) t.point2.x, (int) t.point2.y);
+        g.drawLine((int) t.point1.x, (int) t.point1.y, (int) t.point3.x, (int) t.point3.y);
+        g.drawLine((int) t.point3.x, (int) t.point3.y, (int) t.point2.x, (int) t.point2.y);
     }
     public void fillTriangle(Graphics g, Triangle t) {
         int[] x = {WIDTH-(int) t.point1.x, WIDTH-(int) t.point2.x, WIDTH-(int) t.point3.x};
@@ -440,37 +520,17 @@ public class Panel extends JPanel {
         @Override
         public void keyPressed(KeyEvent e) {
 
-            switch(e.getKeyCode()) {
-                case KeyEvent.VK_SPACE:
-                    camera.y += 1;
-                    break;
-                case KeyEvent.VK_SHIFT:
-                    camera.y -= 1;
-                    break;
-                case KeyEvent.VK_D:
-                    camera = addVec(camera, multVec(crossProduct(lookDir, new Point(0, 1, 0)), 2));
-                    break;
-                case KeyEvent.VK_A:
-                    camera = addVec(camera, multVec(crossProduct(lookDir, new Point(0, 1, 0)), -2));
-                    break;
-                case KeyEvent.VK_W:
-                    camera = addVec(camera, multVec(lookDir, 2));
-                    break;
-                case KeyEvent.VK_S:
-                    camera = subVec(camera, multVec(lookDir, 2));
-                    break;
-                case KeyEvent.VK_LEFT:
-                    yaw -= 0.1;
-                    break;
-                case KeyEvent.VK_RIGHT:
-                    yaw += 0.1;
-                    break;
-                case KeyEvent.VK_UP:
-                    pitch += 0.1;
-                    break;
-                case KeyEvent.VK_DOWN:
-                    pitch -= 0.1;
-                    break;
+            switch (e.getKeyCode()) {
+                case KeyEvent.VK_SPACE -> camera.y += 1;
+                case KeyEvent.VK_SHIFT -> camera.y -= 1;
+                case KeyEvent.VK_D -> camera = addVec(camera, multVec(crossProduct(lookDir, new Point(0, 1, 0)), 2));
+                case KeyEvent.VK_A -> camera = addVec(camera, multVec(crossProduct(lookDir, new Point(0, 1, 0)), -2));
+                case KeyEvent.VK_W -> camera = addVec(camera, multVec(new Point(lookDir.x, 0, lookDir.z), 2));
+                case KeyEvent.VK_S -> camera = subVec(camera, multVec(new Point(lookDir.x, 0, lookDir.z), 2));
+                case KeyEvent.VK_LEFT -> yaw -= 0.1;
+                case KeyEvent.VK_RIGHT -> yaw += 0.1;
+                case KeyEvent.VK_UP -> pitch += 0.1;
+                case KeyEvent.VK_DOWN -> pitch -= 0.1;
             }
             repaint();
         }
@@ -504,21 +564,265 @@ public class Panel extends JPanel {
             this.y = y;
             this.z = z;
         }
+        //I've been told that a w component is necessary to distinguish from a point and a vector
+        //and if you don't want it, you have to make two different sets of functions so...
+        //whoops, this is definitely sloppy code
+        //that said, for now I'm just keeping track of what's supposed to be a point
+        //and what's supposed to be a vector manually, so for something small like this
+        //it should be fine for the most part
+    }
+    public class TexPoint {
+        double u;
+        double v;
+        public TexPoint(double u, double v) {
+            this.u = u;
+            this.v = v;
+        }
     }
     public class Triangle {
         Point point1, point2, point3;
+        TexPoint[] tPoints;
         Color c;
         public Triangle (Point p1, Point p2, Point p3) {
             point1 = p1;
             point2 = p2;
             point3 = p3;
             c = new Color(0, 0, 0);
+
+            tPoints = new TexPoint[]{new TexPoint(0, 0), new TexPoint(0, 0), new TexPoint(0, 0)};
         }
 
         public String toString() { //for debugging!
             return "p1 - x: " + point1.x + " y: " + point1.y + " z: " + point1.z +
                     "\n p2 - x: " + point2.x + " y: " + point2.y + " z: " + point2.z +
                     "\n p3 - x: " + point3.x + " y: " + point3.y + " z: " + point3.z;
+        }
+    }
+    public class TexTriangle {
+        int x1, y1, x2, y2, x3, y3;
+        double u1, v1, u2, v2, u3, v3;
+        public TexTriangle (int x1, int y1, double u1, double v1,
+                           int x2, int y2, double u2, double v2,
+                           int x3, int y3, double u3, double v3) {
+            //int and no z because this is after projection and all that but texPoints are still double
+
+            this.x1 = x1;
+            this.y1 = y1;
+            this.x2 = x2;
+            this.y2 = y2;
+            this.x3 = x3;
+            this.y3 = y3;
+
+            this.u1 = u1;
+            this.v1 = v1;
+            this.u2 = u2;
+            this.v2 = v2;
+            this.u3 = u3;
+            this.v3 = v3;
+
+            init();
+        }
+        public void init() {
+            int temp1;
+            double temp2;
+            if (y2 < y1) {
+                temp1 = x1;
+                x1 = x2;
+                x2 = temp1;
+                temp1 = y1;
+                y1 = y2;
+                y2 = temp1;
+                temp2 = u1;
+                u1 = u2;
+                u2 = temp2;
+                temp2 = v1;
+                v1 = v2;
+                v2 = temp2;
+            }
+            if (y3 < y1) {
+                temp1 = x1;
+                x1 = x3;
+                x3 = temp1;
+                temp1 = y1;
+                y1 = y3;
+                y3 = temp1;
+                temp2 = u1;
+                u1 = u3;
+                u3 = temp2;
+                temp2 = v1;
+                v1 = v3;
+                v3 = temp2;
+            }
+            if (y3 < y2) {
+                temp1 = x3;
+                x3 = x2;
+                x2 = temp1;
+                temp1 = y3;
+                y3 = y2;
+                y2 = temp1;
+                temp2 = u3;
+                u3 = u2;
+                u2 = temp2;
+                temp2 = v3;
+                v3 = v2;
+                v2 = temp2;
+            } //basically orders them by y value in increasing order
+        } //this whole function could actually be placed in the initialized but I made a mistake and I'm too lazy to go through all that again
+
+        public void drawTexTri(Graphics g, BufferedImage bi) {
+            //the number of variables created in this one class is honestly frightening
+            //I would like there to be less but the absolute unreadability would be even more frightening
+
+            int dx1 = x2 - x1;
+            int dy1 = y2 - y1;
+            double du1 = u2 - u1;
+            double dv1 = v2 - v1;
+
+            int dx2 = x3 - x1;
+            int dy2 = y3 - y1;
+            double du2 = u3 - u1;
+            double dv2 = v3 - v1;
+
+            double dStartXStep = 0; double dEndXStep = 0;
+            double dU1Step = 0; double dV1Step = 0; double dU2Step = 0; double dV2Step = 0;
+            if (dy1 != 0) {
+                dStartXStep = (double)dx1/Math.abs(dy1);
+                dU1Step = du1/Math.abs(dy1);
+                dV1Step = dv1/Math.abs(dy1);
+            }
+            if (dy2 != 0) {
+                dEndXStep = (double)dx2/Math.abs(dy2);
+                dU2Step = du2 /Math.abs(dy2);
+                dV2Step = dv2 /Math.abs(dy2);
+            }
+
+            if (dy1 != 0) { //if the line is not flat, draw the triangle from the top to the point in between
+                for (int i = y1; i <= y2; i++) {
+                    int startX = x1 + (int) ((i-y1)*dStartXStep);
+                    int endX = x1 + (int) ((i-y1)*dEndXStep);
+
+                    double startU = u1 + (int) ((i-y1)*dU1Step);
+                    double startV = v1 + (int) ((i-y1)*dV1Step);
+                    double endU = u1 + (int) ((i-y1)*dU2Step);
+                    double endV = v1 + (int) ((i-y1)*dV2Step);
+
+                    //need to sort along x
+                    if (startX > endX) {
+                        int temp1 = startX;
+                        startX = endX;
+                        endX = temp1;
+                        double temp2 = startU;
+                        startU = endU;
+                        endU = temp2;
+                        temp2 = startV;
+                        startV = endV;
+                        endV = temp2;
+                    }
+
+                    double u;
+                    double v;
+                    double tStep = 1.0/(endX-startX);
+                    double t = 0;
+                    for (int j = startX; j < endX; j++) {
+                        u = (1-t)*startU + t*endU; //linear interpolation, weighted average version
+                        v = (1-t)*startV + t*endV;
+
+                        int finU = Math.max(Math.min((int)(u*bi.getWidth()), bi.getWidth()-1), 0);
+                        int finV = Math.max(Math.min((int)(v*bi.getHeight()), bi.getHeight()-1), 0);
+                        int color = bi.getRGB(finU, finV);
+                        System.out.println("u: " + u);
+                        System.out.println("v: " + v);
+                        if (u == 0 && v == 0) {
+                            System.out.println(startU + " " + endU);
+                            System.out.println(startV + " " + endV);
+                        }
+                        else {
+                            System.out.println(finU);
+                            System.out.println(finV);
+
+                            //the getRGB function returns the RGB values bitwise so we need to convert them
+                            int blue = color & 0xff; //basically isolates the blue value (rightmost 8)
+                            // the 0xff is a hexadecimal number that represents a bunch of 1s and the and gets rid of the stuff we don't need
+                            int green = (color & 0xff00) >> 8; //then gets the red value (the 8 bits after blue value)
+                            //the extra 0s after the hexadecimal shift it 8 left so we can get the red values, and then the >> shifts the number back
+                            int red = (color & 0xff0000) >> 16; //same thing as before but with 16
+                            g.setColor(new Color(red, green, blue));
+                            g.drawLine(j, i, j, i);
+
+                            t += tStep;
+                        }
+
+                    }
+
+                }
+            }
+
+            dx1 = x3 - x2;
+            dy1 = y3 - y2;
+            du1 = u3 - u2;
+            dv1 = v3 - v2;
+
+            dU1Step = 0; dV1Step = 0;
+            if (dy1 != 0) {
+                dStartXStep = (double)dx1/Math.abs(dy1);
+                dU1Step = du1 /Math.abs(dy1);
+                dV1Step = dv1 /Math.abs(dy1);
+            }
+            if (dy2 != 0) {
+                dEndXStep = (double)dx2/Math.abs(dy2);
+                dU2Step = du2 /Math.abs(dy2);
+                dV2Step = dv2 /Math.abs(dy2);
+            }
+
+            if (dy1 != 0) {
+                for (int i = y2; i <= y3; i++) {
+                    int startX = x2 + (int) ((i-y2)*dStartXStep);
+                    int endX = x1 + (int) ((i-y1)*dEndXStep);
+
+                    double startU = u2 + (int) ((i-y2)*dU1Step);
+                    double startV = v2 + (int) ((i-y2)*dV1Step);
+                    double endU = u1 + (int) ((i-y1)*dU2Step);
+                    double endV = v1 + (int) ((i-y1)*dV2Step);
+
+                    //need to sort along x
+                    if (startX > endX) {
+                        int temp1 = startX;
+                        startX = endX;
+                        endX = temp1;
+                        double temp2 = startU;
+                        startU = endU;
+                        endU = temp2;
+                        temp2 = startV;
+                        startV = endV;
+                        endV = temp2;
+                    }
+
+                    double u;
+                    double v;
+                    double tStep = 1.0/(startX-endX);
+                    double t = 0;
+                    for (int j = startX; j < endX; j++) {
+                        u = (1-t)*startU + t*endU; //linear interpolation, weighted average version
+                        v = (1-t)*startV + t*endV;
+
+                        int finU = Math.max(Math.min((int)(u*bi.getWidth()), bi.getWidth()-1), 0);
+                        int finV = Math.max(Math.min((int)(v*bi.getHeight()), bi.getHeight()-1), 0);
+                        int color = bi.getRGB(finU, finV);
+                        //the getRGB function returns the RGB values bitwise so we need to convert them
+                        int blue = color & 0xff; //basically isolates the blue value (rightmost 8)
+                        // the 0xff is a hexadecimal number that represents a bunch of 1s and the and gets rid of the stuff we don't need
+                        int green = (color & 0xff00) >> 8; //then gets the red value (the 8 bits after blue value)
+                        //the extra 0s after the hexadecimal shift it 8 left so we can get the red values, and then the >> shifts the number back
+                        int red = (color & 0xff0000) >> 16; //same thing as before but with 16
+                        g.setColor(new Color(red, green, blue));
+                        g.drawLine(j, i, j, i); //drawing a line with the same start and end draws a single pixel
+
+                        t += tStep;
+
+                    }
+
+                }
+            }
         }
     }
     public class Mesh {
@@ -531,7 +835,7 @@ public class Panel extends JPanel {
             try {
                 BufferedReader in = new BufferedReader(new FileReader(fileName));
                 String s = in.readLine();
-                ArrayList<Point> pool = new ArrayList<Point>();
+                ArrayList<Point> pool = new ArrayList<>();
                 while (s != null) {
                     StringTokenizer str = new StringTokenizer(s);
                     if (str.hasMoreTokens()) {
