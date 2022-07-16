@@ -435,8 +435,8 @@ public class Panel extends JPanel {
                 case KeyEvent.VK_SHIFT -> camera.y -= 1;
                 case KeyEvent.VK_D -> camera = addVec(camera, multVec(crossProduct(lookDir, new Point(0, 1, 0)), 2));
                 case KeyEvent.VK_A -> camera = addVec(camera, multVec(crossProduct(lookDir, new Point(0, 1, 0)), -2));
-                case KeyEvent.VK_W -> camera = addVec(camera, multVec(lookDir, 2));
-                case KeyEvent.VK_S -> camera = subVec(camera, multVec(lookDir, 2));
+                case KeyEvent.VK_W -> camera = addVec(camera, multVec(new Point(lookDir.x, 0, lookDir.z), 2));
+                case KeyEvent.VK_S -> camera = subVec(camera, multVec(new Point(lookDir.x, 0, lookDir.z), 2));
                 case KeyEvent.VK_LEFT -> yaw -= 0.1;
                 case KeyEvent.VK_RIGHT -> yaw += 0.1;
                 case KeyEvent.VK_UP -> pitch += 0.1;
