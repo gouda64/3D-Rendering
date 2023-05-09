@@ -1,7 +1,7 @@
 package graphics;
 
 public class Matrix {
-    public static Point multiplyVectMat (Point i, double[][] m) {
+    public static Point multiplyVecMat(Point i, double[][] m) {
         //m is a 4x4 2d array
         double x = i.x*m[0][0] + i.y*m[1][0] + i.z*m[2][0] + m[3][0]; //remember fourth imaginary vector part is 1!
         double y = i.x*m[0][1] + i.y*m[1][1] + i.z*m[2][1] + m[3][1];
@@ -16,7 +16,7 @@ public class Matrix {
         return new Point(x, y, z);
     }
 
-    public static double[][] matIdentity() {
+    public static double[][] identity() {
         double[][] m = new double[4][4];
         m[0][0] = 1;
         m[1][1] = 1;
@@ -25,7 +25,7 @@ public class Matrix {
         return m;
     }
 
-    public static double[][] matRotX(double rad) {
+    public static double[][] rotX(double rad) {
         double[][] rotX = new double[4][4];
         rotX[0][0] = 1;
         rotX[1][1] = Math.cos(rad);
@@ -36,7 +36,7 @@ public class Matrix {
         return rotX;
     }
 
-    public static double[][] matRotY(double rad) {
+    public static double[][] rotY(double rad) {
         double[][] rotY = new double[4][4];
         rotY[0][0] = Math.cos(rad);
         rotY[0][2] = Math.sin(rad);
@@ -47,7 +47,7 @@ public class Matrix {
         return rotY;
     }
 
-    public static double[][] matRotZ(double rad) {
+    public static double[][] rotZ(double rad) {
         double[][] rotZ = new double[4][4];
         rotZ[0][0] = Math.cos(rad);
         rotZ[0][1] = -1*Math.sin(rad);
@@ -58,7 +58,7 @@ public class Matrix {
         return rotZ;
     }
 
-    public static double[][] matTranslation(double x, double y, double z) {
+    public static double[][] translation(double x, double y, double z) {
         double[][] mat = new double[4][4];
         mat[0][0] = 1;
         mat[1][1] = 1;
@@ -70,7 +70,7 @@ public class Matrix {
         return mat;
     }
 
-    public static double[][] multiplyMat(double[][] m1, double[][] m2) {
+    public static double[][] multiply(double[][] m1, double[][] m2) {
         double[][] mat = new double[m1.length][m2.length];
         for (int r = 0; r < m1.length; r++) {
             for (int c = 0; c < m2.length; c++) {

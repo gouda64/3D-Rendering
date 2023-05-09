@@ -3,7 +3,7 @@ package graphics;
 public class Point {
     //maybe make some constants sometime (like unit vecs)
 
-    public double x, y, z;
+    public double x, y, z; //semantic meaning over slight efficiency improvements fr
 
     public Point(double x, double y, double z) {
         this.x = x;
@@ -32,7 +32,7 @@ public class Point {
     }
 
     public double length() {
-        return Math.sqrt(x*x + y*y + z*z);
+        return Math.sqrt(x* x + y* y + z* z);
     }
     public Point normalize() {
         double l = length();

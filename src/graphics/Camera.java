@@ -16,8 +16,8 @@ public class Camera { //TODO: work on textures
     //projection matrix (multiply with input vector) [[xCoeff, 0, 0, 0], [0, yCoeff, 0, 0], [0, 0, zCoeff, zDispl], [0, 0, 1, 0]]
     private final Mesh meshCube;
     private double[][] projectionMatrix; //multiply by the input point/vector to normalize it into the screen space!
-    private graphics.Point camera;
-    private graphics.Point lookDir;
+    private Point camera;
+    private Point lookDir;
     private double yaw; //basically left-right rotation
     private double pitch; //up-down rotations
 
@@ -28,13 +28,13 @@ public class Camera { //TODO: work on textures
         fov = 90;
         projectionMatrix = matProjection(fov,(double) this.height/this.width, 0.5, 1000);
 
-        camera = new graphics.Point(0, 0, 0);
-        lookDir = new graphics.Point(0, 0, 1);
+        camera = new Point(0, 0, 0);
+        lookDir = new Point(0, 0, 1);
         yaw = 0;
         pitch = 0;
 
         //ArrayList<graphics.Triangle> t = new ArrayList<graphics.Triangle>();
-        //t.add(new graphics.Triangle(new graphics.Point(10, 10, 10), new graphics.Point(20, 20, 10), new graphics.Point(30, 10, 10)));
+        //t.add(new graphics.Triangle(new Point(10, 10, 10), new Point(20, 20, 10), new Point(30, 10, 10)));
         //meshCube = new graphics.Mesh(t);
         // for debugging (literally one triangle)
 
@@ -42,65 +42,65 @@ public class Camera { //TODO: work on textures
         meshCube.readObj(mapFile);
     }
 
+    public List<Triangle> view() {
+        //10??
+        double[][] worldMat = Matrix.translation(0, 0, 10);
 
-    public List<Triangle> view() { //later - convert to pixel by pixel system (somehow?)
-        //later - optimize - preserve info with small/no view changes - might be in other class
-        ArrayList<Triangle> trisToDraw = new ArrayList<>();
-
-        //TODO: clean up sometime (what does this even mean??)
-        double[][] worldMat = Matrix.multiplyMat(Matrix.matRotZ(0), Matrix.matRotX(0));
-        worldMat = Matrix.multiplyMat(worldMat, Matrix.matTranslation(0, 0, 10));
-
-        lookDir = Matrix.multiplyVectMat(new graphics.Point(0, 0, 1), Matrix.matRotY(yaw));
-        //TODO: fix rotation bug
-        lookDir = Matrix.multiplyVectMat(lookDir, Matrix.matRotX(pitch));
-        double[][] camMat = pointAt(camera, camera.add(lookDir), new graphics.Point(0, 1, 0))[1];
+        lookDir = Matrix.multiplyVecMat(new Point(0, 0, 1), Matrix.rotY(yaw));
+        //TODO: fix rotation bug - something to do with pitch (not that easy?)
+        lookDir = Matrix.multiplyVecMat(lookDir, Matrix.rotX(pitch));
+        double[][] camMat = pointAt(camera, camera.add(lookDir), new Point(0, 1, 0))[1];
         //we need the inverse!! not the og, emphasis on the [1]
 
         //draw triangles
-        for (Triangle t : meshCube.tris) {
+        List<Triangle> trisToDraw = cullAndProject(worldMat, camMat);
+        sortByAvgZ(trisToDraw);
 
-            Triangle tTransformed = new Triangle(Matrix.multiplyVectMat(t.p1, worldMat),
-                    Matrix.multiplyVectMat(t.p2, worldMat), Matrix.multiplyVectMat(t.p3, worldMat));
+        List<Triangle> view = new ArrayList<>();
+        for (Triangle t : trisToDraw) {
+            //clip triangles against screen edges
+            view.addAll(getClippedTris(t));
+        }
+
+        return view;
+    }
+
+    private List<Triangle> cullAndProject(double[][] worldMat, double[][] camMat) {
+        List<Triangle> trisToDraw = new ArrayList<>();
+
+        for (Triangle t : meshCube.tris) {
+            Triangle tTransformed = transformTriByMat(t, worldMat);
 
             //triangle culling
-            graphics.Point normal, line1, line2; //actually 3D vectors but I'm too lazy to make a new class
-            line1 = tTransformed.p2.sub(tTransformed.p1);
-            line2 = tTransformed.p3.sub(tTransformed.p1);
+            Point normal, line1, line2; //actually 3D vectors but I'm too lazy to make a new class
+            line1 = tTransformed.pts[1].sub(tTransformed.pts[0]);
+            line2 = tTransformed.pts[2].sub(tTransformed.pts[0]);
             normal = line1.crossProduct(line2).normalize();
 
-            //if(true) {
-            if (normal.dotProduct(tTransformed.p1.sub(camera)) < 0) { //takes into account perspective w/ dot product
+            if (normal.dotProduct(tTransformed.pts[0].sub(camera)) < 0) { //takes into account perspective w/ dot product
 
                 //add lighting
-                graphics.Point light_direction = new graphics.Point(0, 0, -1).normalize(); //single direction, very simple because it's just a huge plane
+                Point lightDirection = new Point(0, 0, -1).normalize();
+                //single direction, very simple because it's just a huge plane
                 //emitting consistent rays of light which is great because it's easy
-
-                double dp = Math.max(0.25, light_direction.dotProduct(normal));
-                Color c = new Color((float)dp, (float)dp, (float)dp);
+                Color c = triColor(t, normal, lightDirection);
 
                 //converting world space to view space
-                Triangle tView = new Triangle(Matrix.multiplyVectMat(tTransformed.p1, camMat),
-                        Matrix.multiplyVectMat(tTransformed.p2, camMat), Matrix.multiplyVectMat(tTransformed.p3, camMat));
+                Triangle tView = transformTriByMat(tTransformed, camMat);
 
-                Triangle[] clippedTris = triClipToPlane(new graphics.Point(0, 0, 0.2), new graphics.Point(0, 0, 1), tView);
-                for (Triangle tris : clippedTris) {
-
-                    Triangle tProjected = new Triangle(Matrix.multiplyVectMat(tris.p1, projectionMatrix),
-                            Matrix.multiplyVectMat(tris.p2, projectionMatrix), Matrix.multiplyVectMat(tris.p3, projectionMatrix));
+                Triangle[] clippedTris = triClipToPlane(new Point(0, 0, 0.2), new Point(0, 0, 1), tView);
+                for (Triangle tri : clippedTris) {
+                    Triangle tProjected = transformTriByMat(tri, projectionMatrix);
 
                     //offset and scale
-                    graphics.Point addP = new graphics.Point(1, 1, 0);
-                    tProjected.p1 = tProjected.p1.add(addP);
-                    tProjected.p2 = tProjected.p2.add(addP);
-                    tProjected.p3 = tProjected.p3.add(addP);
-
-                    tProjected.p1.x *= 0.5 * width;
-                    tProjected.p1.y *= 0.5 * height;
-                    tProjected.p2.x *= 0.5 * width;
-                    tProjected.p2.y *= 0.5 * height;
-                    tProjected.p3.x *= 0.5 * width;
-                    tProjected.p3.y *= 0.5 * height;
+                    Point addP = new Point(1, 1, 0);
+                    for (int i = 0; i < tProjected.pts.length; i++) {
+                        tProjected.pts[i] = tProjected.pts[i].add(addP);
+                    }
+                    for (int i = 0; i < tProjected.pts.length; i++) {
+                        tProjected.pts[i].x *= 0.5 * width;
+                        tProjected.pts[i].y *= 0.5 * height;
+                    }
 
                     tProjected.c = c;
 
@@ -108,57 +108,60 @@ public class Camera { //TODO: work on textures
                 }
             }
         }
+        return trisToDraw;
+    }
 
-        Comparator<Triangle> compareByZ = (o1, o2) -> {
-            double z1 = (o1.p1.z + o1.p2.z + o1.p3.z)/3;
-            double z2 = (o2.p1.z + o2.p2.z + o2.p3.z)/3;
+    private List<Triangle> getClippedTris(Triangle t) {
+        List<Triangle> clippedTris = new ArrayList<>();
+        clippedTris.add(t);
+
+        int newTris = 1;
+        for (int i = 0; i < 4; i++) {
+
+            while (newTris > 0) {
+                Triangle test = clippedTris.remove(0);
+                newTris--;
+                Triangle[] clippedTemp = switch (i) {
+                    case 0 -> //top
+                            triClipToPlane(new Point(0, 0, 0), new Point(0, 1, 0), test);
+                    case 1 -> //bottom
+                            triClipToPlane(new Point(0, height - 1, 0), new Point(0, -1, 0), test);
+                    case 2 -> //left
+                            triClipToPlane(new Point(0, 0, 0), new Point(1, 0, 0), test);
+                    case 3 -> //right
+                            triClipToPlane(new Point(width - 1, 0, 0), new Point(-1, 0, 0), test);
+                    default -> new Triangle[1];
+                };
+
+                Collections.addAll(clippedTris, clippedTemp);
+            }
+            newTris = clippedTris.size();
+        }
+
+        return clippedTris;
+    }
+
+    private void sortByAvgZ(List<Triangle> tris) {
+        Comparator<Triangle> compareByZ = (t1, t2) -> {
+            double z1 = t1.avgZ();
+            double z2 = t2.avgZ();
             if (z1-z2 < 0) {
                 return 1;
-            }
-            if (z1-z2 == 0) {
-                return 0;
             }
             if (z1-z2 > 0){
                 return -1;
             }
             return 0;
         };
-        trisToDraw.sort(compareByZ);
-
-        List<Triangle> view = new ArrayList<>(); //later - optimize
-        for (Triangle t : trisToDraw) {
-            //clip triangles against screen edges
-            ArrayList<Triangle> trisToClip = new ArrayList<>();
-            trisToClip.add(t);
-
-            int newTris = 1;
-            for (int i = 0; i < 4; i++) {
-
-                while (newTris > 0) {
-                    Triangle test = trisToClip.remove(0);
-                    newTris--;
-                    Triangle[] clippedTris = switch (i) {
-                        case 0 -> //top
-                                triClipToPlane(new graphics.Point(0, 0, 0), new graphics.Point(0, 1, 0), test);
-                        case 1 -> //bottom
-                                triClipToPlane(new graphics.Point(0, height - 1, 0), new graphics.Point(0, -1, 0), test);
-                        case 2 -> //left
-                                triClipToPlane(new graphics.Point(0, 0, 0), new graphics.Point(1, 0, 0), test);
-                        case 3 -> //right
-                                triClipToPlane(new graphics.Point(width - 1, 0, 0), new graphics.Point(-1, 0, 0), test);
-                        default -> new Triangle[1];
-                    };
-
-                    Collections.addAll(trisToClip, clippedTris);
-                }
-                newTris = trisToClip.size();
-            }
-
-            //just to clarify it's called trisToClip but they're done clipping at this point
-            view.addAll(trisToClip);
-        }
-
-        return view;
+        tris.sort(compareByZ);
+    }
+    private Color triColor(Triangle t, Point triNormal, Point lightDirection) {
+        double dp = Math.max(0.25, lightDirection.dotProduct(triNormal));
+        return new Color((float) dp, (float) dp, (float) dp);
+    }
+    private Triangle transformTriByMat(Triangle t, double[][] mat) {
+        return new Triangle(Matrix.multiplyVecMat(t.pts[0], mat),
+                Matrix.multiplyVecMat(t.pts[1], mat), Matrix.multiplyVecMat(t.pts[2], mat));
     }
 
     private static double[][] matProjection(double fovDeg, double aspectRatio, double zNear, double zFar) {
@@ -172,93 +175,81 @@ public class Camera { //TODO: work on textures
         return projMat;
     }
 
-    private static graphics.Point pointIntersectPlane(graphics.Point pPoint, graphics.Point pNormal, graphics.Point lStart, graphics.Point lEnd) {
+    private static Point pointIntersectPlane(Point pPoint, Point pNormal, Point lStart, Point lEnd) {
         pNormal = pNormal.normalize();
         double t = (pNormal.dotProduct(pPoint) - lStart.dotProduct(pNormal)) / (lEnd.dotProduct(pNormal) - lStart.dotProduct(pNormal));
         //just something I found on stack overflow idk how it does it either
         return lStart.add(lEnd.sub(lStart).mult(t));
     }
 
-    private static Triangle[] triClipToPlane(graphics.Point pPoint, graphics.Point pNormal, Triangle t) {
+    private static Triangle[] triClipToPlane(Point pPoint, Point pNormal, Triangle t) {
         pNormal = pNormal.normalize();
         //signed shortest distance from point to plane
-        graphics.Point temp = t.p1;
+        Point temp = t.pts[0];
         //DON'T normalize temp messes everything up I know from the week I spent debugging this thing
-        double dist1 = pNormal.x*temp.x + pNormal.y*temp.y + pNormal.z*temp.z - pNormal.dotProduct(pPoint);
-        temp = t.p2;
-        double dist2 = pNormal.dotProduct(temp) - pNormal.dotProduct(pPoint);
-        temp = t.p3;
-        double dist3 = pNormal.dotProduct(temp)- pNormal.dotProduct(pPoint);
-        graphics.Point[] inside = new graphics.Point[3]; int inNum = 0;
-        graphics.Point[] outside = new graphics.Point[3]; int outNum = 0;
+        double[] dists = new double[3];
 
-        if (dist1 >= 0) {
-            inside[inNum] = t.p1;
-            inNum++;
-        }
-        else {
-            outside[outNum] = t.p1;
-            outNum++;
-        }
-        if (dist2 >= 0) {
-            inside[inNum] = t.p2;
-            inNum++;
-        }
-        else {
-            outside[outNum] = t.p2;
-            outNum++;
-        }
-        if (dist3 >= 0) {
-            inside[inNum] = t.p3;
-            inNum++;
-        }
-        else {
-            outside[outNum] = t.p3;
-            outNum++;
+        dists[0] = pNormal.x*temp.x + pNormal.y*temp.y + pNormal.z*temp.z - pNormal.dotProduct(pPoint);
+        temp = t.pts[1];
+        dists[1] = pNormal.dotProduct(temp) - pNormal.dotProduct(pPoint);
+        temp = t.pts[2];
+        dists[2] = pNormal.dotProduct(temp)- pNormal.dotProduct(pPoint);
+
+        Point[] inside = new Point[3]; int inNum = 0;
+        Point[] outside = new Point[3]; int outNum = 0;
+
+        for (int i = 0; i < dists.length; i++) {
+            if (dists[i] >= 0) {
+                inside[inNum] = t.pts[i];
+                inNum++;
+            }
+            else {
+                outside[outNum] = t.pts[i];
+                outNum++;
+            }
         }
 
-        if (inNum == 0) {
-            return new Triangle[] {};
-        }
-        else if (inNum == 3) {
-            return new Triangle[] {t};
-        }
-        else if (inNum == 1) {
-            Triangle newT = new Triangle(null, null, null);
-            newT.p1 = inside[0];
-            newT.p2 = pointIntersectPlane(pPoint, pNormal, inside[0], outside[0]);
-            newT.p3 = pointIntersectPlane(pPoint, pNormal, inside[0], outside[1]);
+        switch (inNum) {
+            case 0:
+                return new Triangle[]{};
+            case 3:
+                return new Triangle[]{t};
+            case 1:
+                Triangle newT = new Triangle(null, null, null);
+                newT.pts[0] = inside[0];
+                newT.pts[1] = pointIntersectPlane(pPoint, pNormal, inside[0], outside[0]);
+                newT.pts[2] = pointIntersectPlane(pPoint, pNormal, inside[0], outside[1]);
 
-            newT.c = t.c; //you can set this and the two below to different colors for a nice demonstration of clipping
+                newT.c = t.c; //you can set this and the two below to different colors for a nice demonstration of clipping
 
-            return new Triangle[] {newT};
-        }
-        else {
-            Triangle newT1 = new Triangle(null, null, null);
-            Triangle newT2 = new Triangle(null, null, null);
+                return new Triangle[]{newT};
+            default:
+                Triangle newT1 = new Triangle(null, null, null);
+                Triangle newT2 = new Triangle(null, null, null);
 
-            newT1.p1 = inside[0];
-            newT1.p2 = inside[1];
-            newT1.p3 = pointIntersectPlane(pPoint, pNormal, inside[0], outside[0]);
+                newT1.pts[0] = inside[0];
+                newT1.pts[1] = inside[1];
+                newT1.pts[2] = pointIntersectPlane(pPoint, pNormal, inside[0], outside[0]);
 
-            newT2.p1 = inside[1];
-            newT2.p2 = pointIntersectPlane(pPoint, pNormal, inside[0], outside[0]);
-            newT2.p3 = pointIntersectPlane(pPoint, pNormal, inside[1], outside[0]);
+                newT2.pts[0] = inside[1];
+                newT2.pts[1] = pointIntersectPlane(pPoint, pNormal, inside[0], outside[0]);
+                newT2.pts[2] = pointIntersectPlane(pPoint, pNormal, inside[1], outside[0]);
 
-            newT1.c = t.c;
-            newT2.c = t.c;
+                newT1.c = t.c;
+                newT2.c = t.c;
 
-            return new Triangle[] {newT1, newT2};
+                return new Triangle[]{newT1, newT2};
         }
     }
 
-    private static double[][][] pointAt(graphics.Point pos, graphics.Point target, graphics.Point up) { //camera info!!
-        graphics.Point newForward = target.sub(pos).normalize();
-        graphics.Point newUp = up.sub(newForward.mult(up.dotProduct(newForward))).normalize(); //how much does newForward affect up?
+    private static double[][][] pointAt(Point pos, Point target, Point up) { //camera info!!
+        Point newForward = target.sub(pos).normalize();
+        Point newUp = up.sub(newForward.mult(up.dotProduct(newForward))).normalize(); //how much does newForward affect up?
         //just visualize the things graphically and it works out, if my linear-algebra-averse brain can do it, you can definitely do it!
-        graphics.Point newRight = newUp.crossProduct(newForward);
+        Point newRight = newUp.crossProduct(newForward);
 
         double[][] mat = new double[4][4]; //transformation matrix for looking at stuff
+        //tbh actually cleaning this up would require too much finangling, sometimes you just gotta accept it
         mat[0][0] = newRight.x; mat[0][1] = newRight.y; mat[0][2] = newRight.z;
         mat[1][0] = newUp.x; mat[1][1] = newUp.y; mat[1][2] = newUp.z;
         mat[2][0] = newForward.x; mat[2][1] = newForward.y; mat[2][2] = newForward.z;
@@ -271,14 +262,14 @@ public class Camera { //TODO: work on textures
         inverseMat[3][0] = -pos.dotProduct(newRight); inverseMat[3][1] = -pos.dotProduct(newUp);
         inverseMat[3][2] = -pos.dotProduct(newForward); inverseMat[3][3] = 1;
 
-        return new double[][][] {mat, inverseMat};
+        return new double[][][] {mat, inverseMat}; //can change to just mat + make function to invert matrix
     }
 
     public void moveY(double amt) {
         camera.y += amt;
     }
     public void moveForBack(double amt) {
-        camera = camera.add(new graphics.Point(lookDir.x, 0, lookDir.z).mult(amt));
+        camera = camera.add(new Point(lookDir.x, 0, lookDir.z).mult(amt));
     }
     public void moveRightLeft(double amt) {
         camera = camera.add(lookDir.crossProduct(new Point(0, 1, 0)).mult(amt));

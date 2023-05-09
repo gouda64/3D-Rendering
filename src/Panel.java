@@ -38,17 +38,17 @@ public class Panel extends JPanel {
     public void draw(Graphics g) {
         for (Triangle t : camera.view()) {
             g.setColor(t.c);
-            fillTriangle(g, t);
+            drawTriangle(g, t);
         }
     }
     public void drawTriangle(Graphics g, Triangle t) {
-        g.drawLine(WIDTH-(int) t.p1.x, HEIGHT-(int) t.p1.y, WIDTH-(int) t.p2.x, HEIGHT-(int) t.p2.y);
-        g.drawLine(WIDTH-(int) t.p1.x, HEIGHT-(int) t.p1.y, WIDTH-(int) t.p3.x, HEIGHT-(int) t.p3.y);
-        g.drawLine(WIDTH-(int) t.p3.x, HEIGHT-(int) t.p3.y, WIDTH-(int) t.p2.x, HEIGHT-(int) t.p2.y);
+        g.drawLine(WIDTH-(int) t.pts[0].x, HEIGHT-(int) t.pts[0].y, WIDTH-(int) t.pts[1].x, HEIGHT-(int) t.pts[1].y);
+        g.drawLine(WIDTH-(int) t.pts[0].x, HEIGHT-(int) t.pts[0].y, WIDTH-(int) t.pts[2].x, HEIGHT-(int) t.pts[2].y);
+        g.drawLine(WIDTH-(int) t.pts[2].x, HEIGHT-(int) t.pts[2].y, WIDTH-(int) t.pts[1].x, HEIGHT-(int) t.pts[1].y);
     }
     public void fillTriangle(Graphics g, Triangle t) {
-        int[] x = {WIDTH-(int) t.p1.x, WIDTH-(int) t.p2.x, WIDTH-(int) t.p3.x};
-        int[] y = {HEIGHT-(int) t.p1.y, HEIGHT-(int) t.p2.y, HEIGHT-(int) t.p3.y};
+        int[] x = {WIDTH-(int) t.pts[0].x, WIDTH-(int) t.pts[1].x, WIDTH-(int) t.pts[2].x};
+        int[] y = {HEIGHT-(int) t.pts[0].y, HEIGHT-(int) t.pts[1].y, HEIGHT-(int) t.pts[2].y};
         Polygon p = new Polygon(x, y, 3);
         g.fillPolygon(p);
     }
