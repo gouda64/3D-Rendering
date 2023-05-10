@@ -5,14 +5,10 @@ import java.awt.*;
 public class Triangle {
     //public Point p1, p2, p3;
     public Point[] pts;
-    public Color c; //TODO: change color storage method?
+    public Color c = new Color(0, 0, 0);
 
     public Triangle(Point p1, Point p2, Point p3) {
-//        this.p1 = p1;
-//        this.p2 = p2;
-//        this.p3 = p3;
         pts = new Point[]{p1, p2, p3};
-        c = new Color(0, 0, 0);
     }
 
     public double avgZ() {
@@ -24,8 +20,8 @@ public class Triangle {
     }
 
     public String toString() { //for debugging!
-        return "p1 - x: " + pts[0].x + " y: " + pts[0].y + " z: " + pts[0].z +
-                "\n p2 - x: " + pts[1].x + " y: " + pts[1].y + " z: " + pts[1].z +
-                "\n p3 - x: " + pts[2].x + " y: " + pts[2].y + " z: " + pts[2].z;
+        return "p1 - " + pts[0].toString() +
+                "\n p2 - " + pts[1].toString() +
+                "\n p3 - " + pts[2].toString();
     }
 }

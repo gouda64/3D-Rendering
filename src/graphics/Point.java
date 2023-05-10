@@ -44,4 +44,8 @@ public class Point {
             return new Point(x, y, z); //or null/error?
         }
     }
+
+    public String toString() {
+        return "x: " + x + " y: " + y + " z: " + z;
+    }
 }

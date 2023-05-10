@@ -47,12 +47,15 @@ public class Camera { //TODO: work on textures
         double[][] worldMat = Matrix.translation(0, 0, 10);
 
         lookDir = Matrix.multiplyVecMat(new Point(0, 0, 1), Matrix.rotY(yaw));
+
         //TODO: fix rotation bug - something to do with pitch (not that easy?)
-        lookDir = Matrix.multiplyVecMat(lookDir, Matrix.rotX(pitch));
+        //lookDir = Matrix.multiplyVecMat(lookDir, Matrix.rotX(pitch));
+        //System.out.println(lookDir);
+
         double[][] camMat = pointAt(camera, camera.add(lookDir), new Point(0, 1, 0))[1];
         //we need the inverse!! not the og, emphasis on the [1]
 
-        //draw triangles
+        //find drawing triangles
         List<Triangle> trisToDraw = cullAndProject(worldMat, camMat);
         sortByAvgZ(trisToDraw);
 
@@ -69,6 +72,7 @@ public class Camera { //TODO: work on textures
         List<Triangle> trisToDraw = new ArrayList<>();
 
         for (Triangle t : meshCube.tris) {
+            //converting to world space
             Triangle tTransformed = transformTriByMat(t, worldMat);
 
             //triangle culling
@@ -83,13 +87,14 @@ public class Camera { //TODO: work on textures
                 Point lightDirection = new Point(0, 0, -1).normalize();
                 //single direction, very simple because it's just a huge plane
                 //emitting consistent rays of light which is great because it's easy
-                Color c = triColor(t, normal, lightDirection);
+                Color c = triLighting(t, normal, lightDirection);
 
                 //converting world space to view space
                 Triangle tView = transformTriByMat(tTransformed, camMat);
 
                 Triangle[] clippedTris = triClipToPlane(new Point(0, 0, 0.2), new Point(0, 0, 1), tView);
                 for (Triangle tri : clippedTris) {
+                    //view space to projected screen space
                     Triangle tProjected = transformTriByMat(tri, projectionMatrix);
 
                     //offset and scale
@@ -155,7 +160,7 @@ public class Camera { //TODO: work on textures
         };
         tris.sort(compareByZ);
     }
-    private Color triColor(Triangle t, Point triNormal, Point lightDirection) {
+    private Color triLighting(Triangle t, Point triNormal, Point lightDirection) {
         double dp = Math.max(0.25, lightDirection.dotProduct(triNormal));
         return new Color((float) dp, (float) dp, (float) dp);
     }
@@ -276,8 +281,15 @@ public class Camera { //TODO: work on textures
     }
     public void turnRightLeft(double amt) {
         yaw += amt;
+        yaw %= 2*Math.PI;
     }
     public void turnUpDown(double amt) {
         pitch += amt;
+        if (pitch >= Math.PI/2) {
+            pitch = Math.PI/2 - 0.01;
+        }
+        else if (pitch <= -Math.PI/2) {
+            pitch = -Math.PI/2 + 0.01;
+        }
     }
 }
