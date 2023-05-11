@@ -5,17 +5,17 @@ import java.util.*;
 import java.util.List;
 
 public class Camera { //TODO: work on textures
-    private int width;
-    private int height;
-    private double fov; //scaling factor is 1/tan(theta/2) for x and y
+    private final int width;
+    private final int height;
+    private final double fov; //scaling factor is 1/tan(theta/2) for x and y
     //zfar/(zfar-znear), aka scaling factor for z
     //offset factor for z -(zfar*znear)/(zfar-znear)
     //x, y, z -> aspectRatio*x*scaleFactor/z, y*scaleFactor/z, zScale*z - (zfar*znear)/(zfar-znear)
     //x' = x/z and y' = y/z (inverse proportionality)
     //input vector [x, y, z, 1]
     //projection matrix (multiply with input vector) [[xCoeff, 0, 0, 0], [0, yCoeff, 0, 0], [0, 0, zCoeff, zDispl], [0, 0, 1, 0]]
-    private final Mesh meshCube;
-    private double[][] projectionMatrix; //multiply by the input point/vector to normalize it into the screen space!
+    private final Mesh mesh;
+    private final double[][] projectionMatrix; //multiply by the input point/vector to normalize it into the screen space!
     private Point camera;
     private Point lookDir;
     private double yaw; //basically left-right rotation
@@ -33,13 +33,13 @@ public class Camera { //TODO: work on textures
         yaw = 0;
         pitch = 0;
 
-        //ArrayList<graphics.Triangle> t = new ArrayList<graphics.Triangle>();
-        //t.add(new graphics.Triangle(new Point(10, 10, 10), new Point(20, 20, 10), new Point(30, 10, 10)));
-        //meshCube = new graphics.Mesh(t);
+//        List<Triangle> testTri = new ArrayList<>();
+//        testTri.add(new Triangle(new Point(10, 10, 10), new Point(20, 20, 10), new Point(30, 10, 10)));
+//        mesh = new Mesh(testTri);
         // for debugging (literally one triangle)
 
-        meshCube = new Mesh(new ArrayList<>());
-        meshCube.readObj(mapFile);
+        mesh = new Mesh(new ArrayList<>());
+        mesh.readObj("./assets/cube.txt");
     }
 
     public List<Triangle> view() {
@@ -71,7 +71,7 @@ public class Camera { //TODO: work on textures
     private List<Triangle> cullAndProject(double[][] worldMat, double[][] camMat) {
         List<Triangle> trisToDraw = new ArrayList<>();
 
-        for (Triangle t : meshCube.tris) {
+        for (Triangle t : mesh.tris) {
             //converting to world space
             Triangle tTransformed = transformTriByMat(t, worldMat);
 
@@ -165,8 +165,8 @@ public class Camera { //TODO: work on textures
         return new Color((float) dp, (float) dp, (float) dp);
     }
     private Triangle transformTriByMat(Triangle t, double[][] mat) {
-        return new Triangle(Matrix.multiplyVecMat(t.pts[0], mat),
-                Matrix.multiplyVecMat(t.pts[1], mat), Matrix.multiplyVecMat(t.pts[2], mat));
+        return new Triangle(Matrix.multiplyVecMat(t.pts[0], mat), //TODO: see if transfer method is fine
+                Matrix.multiplyVecMat(t.pts[1], mat), Matrix.multiplyVecMat(t.pts[2], mat), t.texPts, t.texFile);
     }
 
     private static double[][] matProjection(double fovDeg, double aspectRatio, double zNear, double zFar) {
@@ -188,6 +188,7 @@ public class Camera { //TODO: work on textures
     }
 
     private static Triangle[] triClipToPlane(Point pPoint, Point pNormal, Triangle t) {
+        //TODO: doesn't transfer texture, fix + perspective
         pNormal = pNormal.normalize();
         //signed shortest distance from point to plane
         Point temp = t.pts[0];
@@ -202,14 +203,18 @@ public class Camera { //TODO: work on textures
 
         Point[] inside = new Point[3]; int inNum = 0;
         Point[] outside = new Point[3]; int outNum = 0;
+        Point[] insideTex = new Point[3];
+        Point[] outsideTex = new Point[3];
 
         for (int i = 0; i < dists.length; i++) {
             if (dists[i] >= 0) {
                 inside[inNum] = t.pts[i];
+                insideTex[inNum] = t.texPts[i];
                 inNum++;
             }
             else {
                 outside[outNum] = t.pts[i];
+                outsideTex[outNum] = t.texPts[i];
                 outNum++;
             }
         }
@@ -225,10 +230,20 @@ public class Camera { //TODO: work on textures
                 newT.pts[1] = pointIntersectPlane(pPoint, pNormal, inside[0], outside[0]);
                 newT.pts[2] = pointIntersectPlane(pPoint, pNormal, inside[0], outside[1]);
 
+                double t1 = (pNormal.dotProduct(pPoint) - inside[0].dotProduct(pNormal)) /
+                        (outside[0].dotProduct(pNormal) - inside[0].dotProduct(pNormal)); //same thing as inside pIP
+                newT.texPts[1].x = t1*(outsideTex[0].x - insideTex[0].x) + insideTex[0].x;
+                newT.texPts[1].y = t1*(outsideTex[0].y - insideTex[0].y) + insideTex[0].y;
+
+                t1 = (pNormal.dotProduct(pPoint) - inside[0].dotProduct(pNormal)) /
+                        (outside[1].dotProduct(pNormal) - inside[0].dotProduct(pNormal));
+                newT.texPts[2].x = t1*(outsideTex[1].x - insideTex[0].x) + insideTex[0].x;
+                newT.texPts[2].y = t1*(outsideTex[1].y - insideTex[0].y) + insideTex[0].y;
+
                 newT.c = t.c; //you can set this and the two below to different colors for a nice demonstration of clipping
 
                 return new Triangle[]{newT};
-            default:
+            default: //quad case
                 Triangle newT1 = new Triangle(null, null, null);
                 Triangle newT2 = new Triangle(null, null, null);
 
@@ -236,9 +251,23 @@ public class Camera { //TODO: work on textures
                 newT1.pts[1] = inside[1];
                 newT1.pts[2] = pointIntersectPlane(pPoint, pNormal, inside[0], outside[0]);
 
+                newT1.texPts[0] = insideTex[0];
+                newT1.texPts[1] = insideTex[1];
+                t1 = (pNormal.dotProduct(pPoint) - inside[0].dotProduct(pNormal)) /
+                        (outside[0].dotProduct(pNormal) - inside[0].dotProduct(pNormal));
+                newT1.texPts[2].x = t1*(outsideTex[0].x - insideTex[0].x) + insideTex[0].x;
+                newT1.texPts[2].y = t1*(outsideTex[0].y - insideTex[0].y) + insideTex[0].y;
+
                 newT2.pts[0] = inside[1];
                 newT2.pts[1] = pointIntersectPlane(pPoint, pNormal, inside[0], outside[0]);
                 newT2.pts[2] = pointIntersectPlane(pPoint, pNormal, inside[1], outside[0]);
+
+                newT2.texPts[0] = insideTex[0];
+                newT2.texPts[1] = insideTex[1];
+                t1 = (pNormal.dotProduct(pPoint) - inside[1].dotProduct(pNormal)) /
+                        (outside[0].dotProduct(pNormal) - inside[1].dotProduct(pNormal));                
+                newT2.texPts[2].x = t1*(outsideTex[0].x - insideTex[1].x) + insideTex[1].x;
+                newT2.texPts[2].y = t1*(outsideTex[0].y - insideTex[1].y) + insideTex[1].y;
 
                 newT1.c = t.c;
                 newT2.c = t.c;

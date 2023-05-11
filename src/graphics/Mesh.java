@@ -3,13 +3,14 @@ package graphics;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.StringTokenizer;
 
 public class Mesh { //if this is still useless later on get rid of it
     //also convert to list sometime or smth
-    ArrayList<Triangle> tris;
+    List<Triangle> tris;
 
-    public Mesh(ArrayList<Triangle> t) {
+    public Mesh(List<Triangle> t) {
         tris = t;
     }
 

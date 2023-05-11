@@ -11,6 +11,12 @@ public class Point {
         this.z = z;
     }
 
+    public Point(double x, double y) {
+        this.x = x;
+        this.y = y;
+        z = 0;
+    }
+
     public Point add(Point p2) {
         return new Point(x + p2.x, y + p2.y, z + p2.z);
     }

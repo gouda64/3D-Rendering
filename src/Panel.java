@@ -3,13 +3,14 @@ import java.awt.*;
 import java.awt.event.*;
 
 import graphics.Camera;
+import graphics.Rasterizer;
 import graphics.Triangle;
 
 public class Panel extends JPanel {
     static final int WIDTH = 1200;
     static final int HEIGHT = 600;
 
-    private Camera camera;
+    private final Camera camera;
 
     private int mouseX;
     private int mouseY;
@@ -27,7 +28,7 @@ public class Panel extends JPanel {
         mouseY = 0;
         firstMove = true;
 
-        camera = new Camera(WIDTH, HEIGHT, "./assets/Mountains.txt");
+        camera = new Camera(WIDTH, HEIGHT, "./assets/cube.txt");
     }
 
     public void paintComponent(Graphics g) {
@@ -37,16 +38,19 @@ public class Panel extends JPanel {
     }
     public void draw(Graphics g) {
         for (Triangle t : camera.view()) {
-            g.setColor(t.c);
+            //g.setColor(t.c);
+            Rasterizer.drawTexTriangle(g, t, WIDTH, HEIGHT);
+            g.setColor(Color.WHITE);
             drawTriangle(g, t);
         }
     }
-    public void drawTriangle(Graphics g, Triangle t) {
+
+    public static void drawTriangle(Graphics g, Triangle t) {
         g.drawLine(WIDTH-(int) t.pts[0].x, HEIGHT-(int) t.pts[0].y, WIDTH-(int) t.pts[1].x, HEIGHT-(int) t.pts[1].y);
         g.drawLine(WIDTH-(int) t.pts[0].x, HEIGHT-(int) t.pts[0].y, WIDTH-(int) t.pts[2].x, HEIGHT-(int) t.pts[2].y);
         g.drawLine(WIDTH-(int) t.pts[2].x, HEIGHT-(int) t.pts[2].y, WIDTH-(int) t.pts[1].x, HEIGHT-(int) t.pts[1].y);
     }
-    public void fillTriangle(Graphics g, Triangle t) {
+    public static void fillTriangle(Graphics g, Triangle t) {
         int[] x = {WIDTH-(int) t.pts[0].x, WIDTH-(int) t.pts[1].x, WIDTH-(int) t.pts[2].x};
         int[] y = {HEIGHT-(int) t.pts[0].y, HEIGHT-(int) t.pts[1].y, HEIGHT-(int) t.pts[2].y};
         Polygon p = new Polygon(x, y, 3);
