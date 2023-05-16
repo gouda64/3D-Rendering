@@ -21,7 +21,6 @@ public class Rasterizer {
             System.out.println("image read failed");
             return;
         }
-        //TODO: clean up someday, somehow, because it's just awful rn DRY is crying screaming throwing up
 
         graphics.Point[] ptsClone = tri.pts.clone();
         int[] sortedIndices = IntStream.range(0, ptsClone.length)
@@ -34,8 +33,8 @@ public class Rasterizer {
 
         int x1 = (int)ptsClone[0].x; int x2 = (int)ptsClone[1].x; int x3 = (int)ptsClone[2].x;
         int y1 = (int)ptsClone[0].y; int y2 = (int)ptsClone[1].y; int y3 = (int)ptsClone[2].y;
-        int u1 = (int)texPtsClone[0].x; int u2 = (int)texPtsClone[1].x; int u3 = (int)texPtsClone[2].x;
-        int v1 = (int)texPtsClone[0].y; int v2 = (int)texPtsClone[1].y; int v3 = (int)texPtsClone[2].y;
+        double u1 = texPtsClone[0].x; double u2 = texPtsClone[1].x; double u3 = texPtsClone[2].x;
+        double v1 = texPtsClone[0].y; double v2 = texPtsClone[1].y; double v3 = texPtsClone[2].y;
         //System.out.println(Arrays.toString(texPtsClone));
 
         int dx1 = x2 - x1; int dy1 = y2 - y1;
@@ -56,22 +55,23 @@ public class Rasterizer {
             dU2Step = du2 /Math.abs(dy2);
             dV2Step = dv2 /Math.abs(dy2);
         }
-        //System.out.println(dU1Step);
+        //System.out.println("ustep " + dU1Step + " " + du1 + " " + dy1);
 
         for (int z = 0; z < 2; z++) {
             if (dy1 != 0) { //if the line is not flat, draw the triangle from the top to the point in between
                 for (int i = (z==0 ? y1 : y2); i <= (z==0 ? y2: y3); i++) {
+                    //if (i >= height) break;
+
                     int startX = z==0 ? (x1 + (int) ((i - y1) * dStartXStep)) :
                             (x2 + (int) ((i - y2) * dStartXStep));
                     int endX = x1 + (int) ((i - y1) * dEndXStep);
 
-
-                    double startU = z==0 ? (u1 + ((i-y1)*dU1Step)) :
-                            (u2 + ((i - y2) * dU1Step));
-                    double startV = z==0 ? (v1 + ((i-y1)*dV1Step)) :
-                            (v2 + ((i - y2) * dV1Step));
-                    double endU = u1 + ((i - y1) * dU2Step);
-                    double endV = v1 + ((i - y1) * dV2Step);
+                    double startU = z==0 ? (u1 + ((double)(i-y1)*dU1Step)) :
+                            (u2 + ((double)(i - y2) * dU1Step));
+                    double startV = z==0 ? (v1 + ((double)(i-y1)*dV1Step)) :
+                            (v2 + ((double)(i - y2) * dV1Step));
+                    double endU = u1 + (double)(i - y1) * dU2Step;
+                    double endV = v1 + (double)(i - y1) * dV2Step;
 
                     //need to sort along x
                     if (startX > endX) {
@@ -89,10 +89,11 @@ public class Rasterizer {
                     double u, v;
                     double tStep = 1.0 / (endX - startX);
                     double t = 0;
-                    //System.out.println("start and end U " + startU + " " + endU);
+//                    System.out.println("start and end U " + startU + " " + endU);
 //                    System.out.println("start and end V " + startV + " " + endV);
 
                     for (int j = startX; j < endX; j++) {
+                        //if (j >= width) break;
                         //linear interpolation, weighted average version
                         //System.out.println(t);
                         u = (1 - t) * startU + t * endU;

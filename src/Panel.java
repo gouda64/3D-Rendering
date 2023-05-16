@@ -60,18 +60,19 @@ public class Panel extends JPanel {
     public class GKeyAdapter extends KeyAdapter {
         @Override
         public void keyPressed(KeyEvent e) {
-
+            final double movement = 0.3;
+            final double rotation = 0.2;
             switch (e.getKeyCode()) {
-                case KeyEvent.VK_SPACE -> camera.moveY(1);
-                case KeyEvent.VK_SHIFT -> camera.moveY(-1);
-                case KeyEvent.VK_D -> camera.moveRightLeft(1);
-                case KeyEvent.VK_A -> camera.moveRightLeft(-1);
-                case KeyEvent.VK_W -> camera.moveForBack(1);
-                case KeyEvent.VK_S -> camera.moveForBack(-1);
-                case KeyEvent.VK_LEFT -> camera.turnRightLeft(-0.2);
-                case KeyEvent.VK_RIGHT -> camera.turnRightLeft(0.2);
-                case KeyEvent.VK_UP -> camera.turnUpDown(0.2);
-                case KeyEvent.VK_DOWN -> camera.turnUpDown(-0.2);
+                case KeyEvent.VK_SPACE -> camera.moveY(movement);
+                case KeyEvent.VK_SHIFT -> camera.moveY(-movement);
+                case KeyEvent.VK_D -> camera.moveRightLeft(movement);
+                case KeyEvent.VK_A -> camera.moveRightLeft(-movement);
+                case KeyEvent.VK_W -> camera.moveForBack(movement);
+                case KeyEvent.VK_S -> camera.moveForBack(-movement);
+                case KeyEvent.VK_LEFT -> camera.turnRightLeft(-rotation);
+                case KeyEvent.VK_RIGHT -> camera.turnRightLeft(rotation);
+                //case KeyEvent.VK_UP -> camera.turnUpDown(rotation);
+                //case KeyEvent.VK_DOWN -> camera.turnUpDown(-rotation);
             }
             repaint();
         }
@@ -85,7 +86,7 @@ public class Panel extends JPanel {
         @Override
         public void mouseMoved(MouseEvent e) {
             if (!firstMove) {
-                camera.turnUpDown(-0.005*(e.getYOnScreen() - mouseY));
+                //camera.turnUpDown(-0.005*(e.getYOnScreen() - mouseY));
                 camera.turnRightLeft(.005*(e.getXOnScreen() - mouseX));
             }
             else {

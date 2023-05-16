@@ -4,7 +4,7 @@ import java.awt.*;
 import java.util.*;
 import java.util.List;
 
-public class Camera { //TODO: work on textures
+public class Camera {
     private final int width;
     private final int height;
     private final double fov; //scaling factor is 1/tan(theta/2) for x and y
@@ -33,13 +33,13 @@ public class Camera { //TODO: work on textures
         yaw = 0;
         pitch = 0;
 
-//        List<Triangle> testTri = new ArrayList<>();
-//        testTri.add(new Triangle(new Point(10, 10, 10), new Point(20, 20, 10), new Point(30, 10, 10)));
-//        mesh = new Mesh(testTri);
+        List<Triangle> testTri = new ArrayList<>();
+        testTri.add(new Triangle(new Point(10, 10, 10), new Point(20, 20, 10), new Point(30, 10, 10)));
+        mesh = new Mesh(testTri);
         // for debugging (literally one triangle)
 
-        mesh = new Mesh(new ArrayList<>());
-        mesh.readObj("./assets/cube.txt");
+//        mesh = new Mesh(new ArrayList<>());
+//        mesh.readObj("./assets/cube.txt");
     }
 
     public List<Triangle> view() {
@@ -125,6 +125,7 @@ public class Camera { //TODO: work on textures
 
             while (newTris > 0) {
                 Triangle test = clippedTris.remove(0);
+                //could be slightly more efficient as a queue but meh
                 newTris--;
                 Triangle[] clippedTemp = switch (i) {
                     case 0 -> //top
@@ -135,7 +136,7 @@ public class Camera { //TODO: work on textures
                             triClipToPlane(new Point(0, 0, 0), new Point(1, 0, 0), test);
                     case 3 -> //right
                             triClipToPlane(new Point(width - 1, 0, 0), new Point(-1, 0, 0), test);
-                    default -> new Triangle[1];
+                    default -> new Triangle[0];
                 };
 
                 Collections.addAll(clippedTris, clippedTemp);
@@ -182,7 +183,8 @@ public class Camera { //TODO: work on textures
 
     private static Point pointIntersectPlane(Point pPoint, Point pNormal, Point lStart, Point lEnd) {
         pNormal = pNormal.normalize();
-        double t = (pNormal.dotProduct(pPoint) - lStart.dotProduct(pNormal)) / (lEnd.dotProduct(pNormal) - lStart.dotProduct(pNormal));
+        double t = (pNormal.dotProduct(pPoint) - lStart.dotProduct(pNormal)) /
+                (lEnd.dotProduct(pNormal) - lStart.dotProduct(pNormal));
         //just something I found on stack overflow idk how it does it either
         return lStart.add(lEnd.sub(lStart).mult(t));
     }
@@ -191,15 +193,13 @@ public class Camera { //TODO: work on textures
         //TODO: doesn't transfer texture, fix + perspective
         pNormal = pNormal.normalize();
         //signed shortest distance from point to plane
-        Point temp = t.pts[0];
         //DON'T normalize temp messes everything up I know from the week I spent debugging this thing
+        //or maybe it doesn't?
         double[] dists = new double[3];
-
-        dists[0] = pNormal.x*temp.x + pNormal.y*temp.y + pNormal.z*temp.z - pNormal.dotProduct(pPoint);
-        temp = t.pts[1];
-        dists[1] = pNormal.dotProduct(temp) - pNormal.dotProduct(pPoint);
-        temp = t.pts[2];
-        dists[2] = pNormal.dotProduct(temp)- pNormal.dotProduct(pPoint);
+        for (int i = 0; i < 3; i++) {
+            Point temp = t.pts[i];//.normalize();
+            dists[i] = pNormal.dotProduct(temp) - pNormal.dotProduct(pPoint);
+        }
 
         Point[] inside = new Point[3]; int inNum = 0;
         Point[] outside = new Point[3]; int outNum = 0;
@@ -219,6 +219,9 @@ public class Camera { //TODO: work on textures
             }
         }
 
+//        int i = 1;
+//        if (i == 1) return new Triangle[]{t};
+
         switch (inNum) {
             case 0:
                 return new Triangle[]{};
@@ -226,26 +229,38 @@ public class Camera { //TODO: work on textures
                 return new Triangle[]{t};
             case 1:
                 Triangle newT = new Triangle(null, null, null);
+                newT.texFile = t.texFile;
+
                 newT.pts[0] = inside[0];
                 newT.pts[1] = pointIntersectPlane(pPoint, pNormal, inside[0], outside[0]);
                 newT.pts[2] = pointIntersectPlane(pPoint, pNormal, inside[0], outside[1]);
 
+                newT.texPts[0] = insideTex[0];
                 double t1 = (pNormal.dotProduct(pPoint) - inside[0].dotProduct(pNormal)) /
                         (outside[0].dotProduct(pNormal) - inside[0].dotProduct(pNormal)); //same thing as inside pIP
-                newT.texPts[1].x = t1*(outsideTex[0].x - insideTex[0].x) + insideTex[0].x;
-                newT.texPts[1].y = t1*(outsideTex[0].y - insideTex[0].y) + insideTex[0].y;
+//                if (Double.isNaN(t1)) {
+//                    System.out.println("no! " + Arrays.toString(t.pts));
+//                }
+
+                newT.texPts[1] = new Point(t1*(outsideTex[0].x - insideTex[0].x) + insideTex[0].x,
+                t1*(outsideTex[0].y - insideTex[0].y) + insideTex[0].y);
 
                 t1 = (pNormal.dotProduct(pPoint) - inside[0].dotProduct(pNormal)) /
                         (outside[1].dotProduct(pNormal) - inside[0].dotProduct(pNormal));
-                newT.texPts[2].x = t1*(outsideTex[1].x - insideTex[0].x) + insideTex[0].x;
-                newT.texPts[2].y = t1*(outsideTex[1].y - insideTex[0].y) + insideTex[0].y;
+                newT.texPts[2]= new Point(t1*(outsideTex[1].x - insideTex[0].x) + insideTex[0].x,
+                        t1*(outsideTex[1].y - insideTex[0].y) + insideTex[0].y);
 
                 newT.c = t.c; //you can set this and the two below to different colors for a nice demonstration of clipping
+
+                //System.out.println(Arrays.toString(newT.texPts));
 
                 return new Triangle[]{newT};
             default: //quad case
                 Triangle newT1 = new Triangle(null, null, null);
                 Triangle newT2 = new Triangle(null, null, null);
+
+                newT1.texFile = t.texFile;
+                newT2.texFile = t.texFile;
 
                 newT1.pts[0] = inside[0];
                 newT1.pts[1] = inside[1];
@@ -255,22 +270,24 @@ public class Camera { //TODO: work on textures
                 newT1.texPts[1] = insideTex[1];
                 t1 = (pNormal.dotProduct(pPoint) - inside[0].dotProduct(pNormal)) /
                         (outside[0].dotProduct(pNormal) - inside[0].dotProduct(pNormal));
-                newT1.texPts[2].x = t1*(outsideTex[0].x - insideTex[0].x) + insideTex[0].x;
-                newT1.texPts[2].y = t1*(outsideTex[0].y - insideTex[0].y) + insideTex[0].y;
+                newT1.texPts[2] = new Point(t1*(outsideTex[0].x - insideTex[0].x) + insideTex[0].x,
+                        t1*(outsideTex[0].y - insideTex[0].y) + insideTex[0].y);
 
                 newT2.pts[0] = inside[1];
-                newT2.pts[1] = pointIntersectPlane(pPoint, pNormal, inside[0], outside[0]);
+                newT2.pts[1] = newT1.pts[2];
                 newT2.pts[2] = pointIntersectPlane(pPoint, pNormal, inside[1], outside[0]);
 
-                newT2.texPts[0] = insideTex[0];
-                newT2.texPts[1] = insideTex[1];
+                newT2.texPts[0] = insideTex[1];
+                newT2.texPts[1] = newT1.texPts[2];
                 t1 = (pNormal.dotProduct(pPoint) - inside[1].dotProduct(pNormal)) /
                         (outside[0].dotProduct(pNormal) - inside[1].dotProduct(pNormal));                
-                newT2.texPts[2].x = t1*(outsideTex[0].x - insideTex[1].x) + insideTex[1].x;
-                newT2.texPts[2].y = t1*(outsideTex[0].y - insideTex[1].y) + insideTex[1].y;
+                newT2.texPts[2] = new Point(t1*(outsideTex[0].x - insideTex[1].x) + insideTex[1].x,
+                            t1*(outsideTex[0].y - insideTex[1].y) + insideTex[1].y);
 
-                newT1.c = t.c;
-                newT2.c = t.c;
+                newT1.c = t.c; newT2.c = t.c;
+
+                //System.out.println(Arrays.toString(newT1.texPts));
+                //System.out.println(Arrays.toString(newT2.texPts));
 
                 return new Triangle[]{newT1, newT2};
         }
@@ -312,13 +329,13 @@ public class Camera { //TODO: work on textures
         yaw += amt;
         yaw %= 2*Math.PI;
     }
-    public void turnUpDown(double amt) {
-        pitch += amt;
-        if (pitch >= Math.PI/2) {
-            pitch = Math.PI/2 - 0.01;
-        }
-        else if (pitch <= -Math.PI/2) {
-            pitch = -Math.PI/2 + 0.01;
-        }
-    }
+//    public void turnUpDown(double amt) {
+//        pitch += amt;
+//        if (pitch >= Math.PI/2) {
+//            pitch = Math.PI/2 - 0.01;
+//        }
+//        else if (pitch <= -Math.PI/2) {
+//            pitch = -Math.PI/2 + 0.01;
+//        }
+//    }
 }
